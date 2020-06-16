@@ -1,7 +1,7 @@
 # Analysis-IC86-BSM-DarkMatter-NeutrinoLine
 Analysis code for the search of decaying and annihilating dark matter with focus on neutrino lines
 
-Code/File structure:
+## Code/File structure:
 
 README.md				this file
 env.sh					file to define environment variables needed by the scripts
@@ -30,14 +30,14 @@ python		 			various python code for the analysis
 
 	SensitivityCalucalation.py	code for sensitivity calculation
 	                                parameters:
-                                                -t type (annihilation/decay)
-                                                --lecut cut on LE BDT score
-                                                --hecut cut on HE BDT score
-                                                -s systematics
-                                                -o oversampling factor
-                                                -c annihilation/decay channel
-                                                -m DM mass
-                                                --profile DM profile NFW/Burkert
+						-t type (annihilation/decay)
+						--lecut cut on LE BDT score
+						--hecut cut on HE BDT score
+						-s systematics
+						-o oversampling factor
+						-c annihilation/decay channel
+						-m DM mass
+						--profile DM profile NFW/Burkert
 						-l confidence level
 						-d likelihood method (poisson or effective)
 						-e energy rebinning
