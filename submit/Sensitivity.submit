@@ -1,0 +1,14 @@
+executable = SensitivityCalculation.py
+
+logdir = /scratch/sbaur/log/
+output = $(logdir)$(JOBNAME).$(Cluster).out
+error = $(logdir)$(JOBNAME).$(Cluster).err
+log = $(logdir)$(JOBNAME).$(Cluster).log
+
+notification   = never 
+universe       = vanilla
+
+should_transfer_files = YES
+
+arguments = -t $(TYPE) -c $(CHANNEL) -x $(PROFILE) -s $(SYST) -a $(LECUT) -b $(LECUT) -m $(MASS) -o $(OVERSAMPLING) -e $(REBINE) -p $(REBINPSI)  -l $(CL) -d $(LLH)
+queue

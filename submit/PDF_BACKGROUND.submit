@@ -1,0 +1,15 @@
+executable = createPDFs.py
+
+logdir = /scratch/sbaur/log/
+output = $(logdir)$(JOBNAME).$(Cluster).out
+error = $(logdir)$(JOBNAME).$(Cluster).err
+log = $(logdir)$(JOBNAME).$(Cluster).log
+
+notification   = never 
+universe       = vanilla
+
+should_transfer_files = YES
+request_memory = 5000
+
+arguments = -t $(TYPE) -s $(SYST) --lecut $(LECUT) --hecut $(HECUT)
+queue
