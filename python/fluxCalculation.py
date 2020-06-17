@@ -1,8 +1,6 @@
 import numpy as np
 from time import time
 from scipy import interpolate, integrate
-import imp
-
 import sys, os
 
 base_path = os.environ['ANALYSIS_BASE_PATH']

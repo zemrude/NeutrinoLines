@@ -85,14 +85,14 @@ else:
 
 DM_file_template = '/PDF_'+systematics_DM+'_DM'+mode+'_'+profile+'profile_LEBDT'+str(LECut)+'_HEBDT'+str(HECut)+    '_2D_'+channel+'_'+str(int(mass))+'GeV_oversampling'+str(nOversampling)
 
-h_DM = np.load(open(base_path+'PDFs/final/'+mode+'/'+channel+'/'+systematics_DM+DM_file_template+'.pkl'))
+h_DM = np.load(open(base_path+'PDFs/'+mode+'/'+channel+'/'+systematics_DM+DM_file_template+'.pkl'))
 h_DM_quad = np.load(open(base_path+'PDFs/'+mode+'/'+channel+'/'+systematics_DM+DM_file_template+'_quad.pkl'))
 
 h_Bkg = {}
 for bkg in ['corsika','atm','astro']:
     Bkg_file = '/PDF_'+systematics+'_background_'+bkg+'_LEBDT'+str(LECut)+'_HEBDT'+str(HECut)+'_2D'
     h_Bkg[bkg] = np.load(open(base_path+'PDFs/background/'+bkg+'/'+systematics+Bkg_file+'.pkl'))
-    h_Bkg[bkg+'_quad'] = np.load(open(base_path+'PDFs/final/background/'+bkg+'/'+systematics+Bkg_file+'_quad.pkl'))
+    h_Bkg[bkg+'_quad'] = np.load(open(base_path+'PDFs/background/'+bkg+'/'+systematics+Bkg_file+'_quad.pkl'))
     #h_Bkg[bkg] = np.load(open(base_path+'PDFs/all_old_stages/background/'+bkg+'/'+Bkg_file+'.pkl'))
     #h_Bkg[bkg+'_quad'] = np.load(open(base_path+'PDFs/all_old_stages/background/'+bkg+'/'+Bkg_file+'_quad.pkl'))    
 
@@ -189,8 +189,8 @@ def LLH(n1,n2,n3,nsig):
 ##------------------------------------#
 ## pseudo x-periments:TS distribution #
 ##------------------------------------#
-print "MC experiments..."
 nMC=100000
+print "Generate",nMC, "background only pseudo-experiments..."
 
 limit={}
 limit['lower']=np.zeros(nMC)
@@ -366,9 +366,9 @@ elif mode == 'decay':
     dic_brazilian['error_95_high'] = error_95_low  
     dic_brazilian['median'] = [1./p_median*10**28]
 
-print 'median: ',p_median,dic_brazilian['median']
+print 'median sesitivity: ',p_median,dic_brazilian['median']
 
-print 'save to', out_file
+print 'save sensitivity to', out_file
 
 np.save(out_file,dic_brazilian)
 

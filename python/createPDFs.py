@@ -179,7 +179,7 @@ def makeDMPDF(mode,channel,profile,systematics,LECut,HECut,mass,nOversampling=-1
 def makeBkgPDF(MCtype,systematics,LECut,HECut):
     
     os.popen('mkdir -p '+outfile_path+MCtype+'/'+systematics+'/')
-    filename_template = MCtype+'/'+systematics+'/PDF_'+systematics+'_'+mode+'_'+MCtype+'_bartol_LEBDT'+str(LECut)+'_HEBDT'+str(HECut)+'_2D'
+    filename_template = MCtype+'/'+systematics+'/PDF_'+systematics+'_'+mode+'_'+MCtype+'_LEBDT'+str(LECut)+'_HEBDT'+str(HECut)+'_2D'
     
     outfile = outfile_path+filename_template+'.pkl'
     outfile_quad = outfile_path+filename_template+'_quad.pkl'
