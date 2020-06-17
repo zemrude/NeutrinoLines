@@ -14,32 +14,31 @@ Analysis code for the search of decaying and annihilating dark matter with focus
   - IceCube_sim.py : functions related to IceCube simulations
   - PPPC_spectra.py : functions to load and interpolate PPPC spectra 
   - fluxCalculation.py : helper functions for DM and atmospheric flux calculations
-  - createPDFs.py : code for the calculation of PDFs
+  - createPDFs.py : code for the calculation of PDFs with parameters
     - `-t type` (background/annihilation/decay)
     - `--lecut value` cut value on LE BDT score
-    --hecut cut on HE BDT score
-    -s systematics
-    -o oversampling factor
-    -c annihilation/decay channel (signal only)
-    -m DM mass (signal only)
-    -p DM profile NFW/Burkert (signal only)
+    - `--hecut value` cut value on HE BDT score
+    - `-s systematics`
+    - `-o oversampling_factor`
+    - `-c channel` annihilation/decay channel (signal only)
+    - `-m mass` (signal only)
+    - `-p profile` DM profile NFW/Burkert (signal only)
     
-  - SensitivityCalucalation.py : code for sensitivity calculation
-  	                                parameters:
-						-t type (annihilation/decay)
-						--lecut cut on LE BDT score
-						--hecut cut on HE BDT score
-						-s systematics
-						-o oversampling factor
-						-c annihilation/decay channel
-						-m DM mass
-						--profile DM profile NFW/Burkert
-						-l confidence level
-						-d likelihood method (poisson or effective)
-						-e energy rebinning
-						-p psi rebinning
-plotting				python plotting scripts
-submit					sample scripts for condor/dagman submission
+  - SensitivityCalucalation.py : code for sensitivity calculation with parameters:
+    - `-t type` (annihilation/decay)
+    - `--lecut value` cut value on LE BDT score
+    - `--hecut value` cut value on HE BDT score
+    - `-s systematics`
+    - `-o oversampling_factor`
+    - `-c channel` annihilation/decay channel
+    - `-m mass`
+    - `--profile profile` DM profile NFW/Burkert
+    - `-l confidence_level`
+    - `-d likelihood_method` (poisson or effective)
+    - `-e energy_rebinning`
+    - `-p psi_rebinning`
+- plotting : python plotting scripts
+- submit : sample scripts for condor/dagman submission
 
 
 ## Prerequisites
