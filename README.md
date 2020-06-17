@@ -16,7 +16,6 @@ python		 			various python code for the analysis
 	IceCube_sim.py			functions related to IceCube simulations
 	PPPC_spectra.py			functions to load and interpolate PPPC spectra 
 	fluxCalculation.py		helper functions for DM and atmospheric flux calculations
-
 	createPDFs.py			code for the calculation of PDFs
 					parameters:
 						-t type (background/annihilation/decay)
@@ -27,7 +26,6 @@ python		 			various python code for the analysis
 						-c annihilation/decay channel (signal only)
 						-m DM mass (signal only)
 						-p DM profile NFW/Burkert (signal only)
-
 	SensitivityCalucalation.py	code for sensitivity calculation
 	                                parameters:
 						-t type (annihilation/decay)
@@ -42,7 +40,6 @@ python		 			various python code for the analysis
 						-d likelihood method (poisson or effective)
 						-e energy rebinning
 						-p psi rebinning
-
 plotting				python plotting scripts
 submit					sample scripts for condor/dagman submission
 
