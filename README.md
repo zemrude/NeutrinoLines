@@ -49,18 +49,17 @@ Analysis code for the search of decaying and annihilating dark matter with focus
 
 ## Workflow / examples
 
-1) PDF creation for signal and background, specific for each channel and mass
-   example for 1 TeV annihilation to nuE, HE sample:
-		./createPDFs.py -t annihilation -p NFW -c nue -m 1000 --lecut -1.0 --hecut 0.3 -s nominal -o 100
-		./createPDFs.py -t background --lecut -1.0 -lhecut 0.3 -s nominal
+1. PDF creation for signal and background, specific for each channel and mass; example for 1 TeV annihilation to nuE, HE sample:
+```
+./createPDFs.py -t annihilation -p NFW -c nue -m 1000 --lecut -1.0 --hecut 0.3 -s nominal -o 100
+./createPDFs.py -t background --lecut -1.0 -lhecut 0.3 -s nominal
+```
 
-2) Calculate sensitivity for each channel and mass
-   example for 1 TeV annihilation to nuE, HE sample:
-		./SensitivityCalculation.py -t annihilation --lecut -1.0 --hecut 0.3 -s nominal -o 100 -c nue -m 1000 --profile NFW -l 90 -d effective -e 2 -p 5
+2. Calculate sensitivity for each channel and mass; example for 1 TeV annihilation to nuE, HE sample:
+```
+./SensitivityCalculation.py -t annihilation --lecut -1.0 --hecut 0.3 -s nominal -o 100 -c nue -m 1000 --profile NFW -l 90 -d effective -e 2 -p 5
+```
 
-3) Unblinded data:
-   tbd...
+3. Unblinded data: tbd...
 
-4) Plotting:
-   tbd...
-
+4. Plotting: tbd...
