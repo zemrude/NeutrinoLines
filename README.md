@@ -15,9 +15,8 @@ Analysis code for the search of decaying and annihilating dark matter with focus
   - PPPC_spectra.py : functions to load and interpolate PPPC spectra 
   - fluxCalculation.py : helper functions for DM and atmospheric flux calculations
   - createPDFs.py : code for the calculation of PDFs
-    parameters:
-    `-t type` (background/annihilation/decay)
-    `--lecut value` cut value on LE BDT score
+    - `-t type` (background/annihilation/decay)
+    - `--lecut value` cut value on LE BDT score
     --hecut cut on HE BDT score
     -s systematics
     -o oversampling factor
