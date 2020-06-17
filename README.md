@@ -3,8 +3,8 @@ Analysis code for the search of decaying and annihilating dark matter with focus
 
 ## Code/File structure:
 
-README.md				this file
-env.sh					file to define environment variables needed by the scripts
+- README.md : this file
+- env.sh : file to define environment variables needed by the scripts
 
 data					folder containing numpy files with the processed data and simulations
 PDFs					folder containing all PDF in pickle format
