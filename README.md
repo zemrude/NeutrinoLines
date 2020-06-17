@@ -5,14 +5,13 @@ Analysis code for the search of decaying and annihilating dark matter with focus
 
 - README.md : this file
 - env.sh : file to define environment variables needed by the scripts
+- data : folder containing numpy files with the processed data and simulations
+- PDFs : folder containing all PDF in pickle format
+- sensitivity : folder containing calculated sensitivities in pickle format
+- resources : folder containing limits by other experiments and the PPPC spectra tables
+- python : various python code for the analysis
+-- fileList.py : provides filenames and paths for the data files
 
-data					folder containing numpy files with the processed data and simulations
-PDFs					folder containing all PDF in pickle format
-sensitivity				folder containing calculated sensitivities in pickle format
-resources				folder containing limits by other experiments and the PPPC spectra tables
-
-python		 			various python code for the analysis
-	fileList.py			provides filenames and paths for the data files
 	IceCube_sim.py			functions related to IceCube simulations
 	PPPC_spectra.py			functions to load and interpolate PPPC spectra 
 	fluxCalculation.py		helper functions for DM and atmospheric flux calculations
