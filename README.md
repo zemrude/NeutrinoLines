@@ -38,6 +38,16 @@ Analysis code for the search of decaying and annihilating dark matter with focus
     - `-e energy_rebinning`
     - `-p psi_rebinning`
 - plotting : python plotting scripts
+  - style.py : general style definitions
+  - plot_DMProfiles.py : figures of DM halo profiles and J factors
+  - plot_PDF.py : plot signal and background PDFs with options:
+    - `-t type` (background, annihilation, decay)
+    - `-s sample` (LE or HE)
+    - `-c channel` (for signal only)
+    - `-m mass` (for signal only)
+    - `-o oversampling` (for signal only)
+  - plot_Sensitivities.py : plot sensitivities
+    - tbd
 - submit : sample scripts for condor/dagman submission
 
 
@@ -62,4 +72,8 @@ Analysis code for the search of decaying and annihilating dark matter with focus
 
 3. Unblinded data: tbd...
 
-4. Plotting: tbd...
+4. Plotting:
+```
+python plot_PDF.py -t background -s HE
+python plot_PDF.py -t annihilation -s HE -c nue -m 1000
+```
