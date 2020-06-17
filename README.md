@@ -10,23 +10,23 @@ Analysis code for the search of decaying and annihilating dark matter with focus
 - sensitivity : folder containing calculated sensitivities in pickle format
 - resources : folder containing limits by other experiments and the PPPC spectra tables
 - python : various python code for the analysis
--- fileList.py : provides filenames and paths for the data files
-
-	IceCube_sim.py			functions related to IceCube simulations
-	PPPC_spectra.py			functions to load and interpolate PPPC spectra 
-	fluxCalculation.py		helper functions for DM and atmospheric flux calculations
-	createPDFs.py			code for the calculation of PDFs
-					parameters:
-						-t type (background/annihilation/decay)
-						--lecut cut on LE BDT score
-						--hecut cut on HE BDT score
-						-s systematics
-						-o oversampling factor
-						-c annihilation/decay channel (signal only)
-						-m DM mass (signal only)
-						-p DM profile NFW/Burkert (signal only)
-	SensitivityCalucalation.py	code for sensitivity calculation
-	                                parameters:
+  - fileList.py : provides filenames and paths for the data files
+  - IceCube_sim.py : functions related to IceCube simulations
+  - PPPC_spectra.py : functions to load and interpolate PPPC spectra 
+  - fluxCalculation.py : helper functions for DM and atmospheric flux calculations
+  - createPDFs.py : code for the calculation of PDFs
+    parameters:
+    `-t type` (background/annihilation/decay)
+    `--lecut value` cut value on LE BDT score
+    --hecut cut on HE BDT score
+    -s systematics
+    -o oversampling factor
+    -c annihilation/decay channel (signal only)
+    -m DM mass (signal only)
+    -p DM profile NFW/Burkert (signal only)
+    
+  - SensitivityCalucalation.py : code for sensitivity calculation
+  	                                parameters:
 						-t type (annihilation/decay)
 						--lecut cut on LE BDT score
 						--hecut cut on HE BDT score
