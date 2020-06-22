@@ -1,8 +1,9 @@
 # Analysis-IC86-BSM-DarkMatter-NeutrinoLine
 Analysis code for the search of decaying and annihilating dark matter with focus on neutrino lines
 
-## Code/File structure:
+Location: `/data/ana/BSM/HT_Cascade/FinalAnalysisCode/`
 
+## Code/File structure:
 - README.md : this file
 - env.sh : file to define environment variables needed by the scripts
 - data : folder containing numpy files with the processed data and simulations
@@ -37,6 +38,11 @@ Analysis code for the search of decaying and annihilating dark matter with focus
     - `-d likelihood_method` (poisson or effective)
     - `-e energy_rebinning`
     - `-p psi_rebinning`
+  - controlVariables.py : code to produce histograms of E_rec and psi_rec for pre-Unblinding cross-checks for data consistency with parameters:
+    - `--lecut value` cut value on LE BDT score
+    - `--hecut value` cut value on HE BDT score
+    - `--psicut value` cut value on psi (to select off-source region)
+
 - plotting : python plotting scripts
   - style.py : general style definitions
   - plot_DMProfiles.py : figures of DM halo profiles and J factors
@@ -48,11 +54,12 @@ Analysis code for the search of decaying and annihilating dark matter with focus
     - `-o oversampling` (for signal only)
   - plot_Sensitivities.py : plot sensitivities
     - tbd
+  - plot_ControlDistributions.py : plot pre-Unblinding control distribution and perform goddness of fit tests
+
 - submit : sample scripts for condor/dagman submission
 
 
 ## Prerequisites
-
 - icerec build, here from /data/user/sbaur/metaprojects/icerec/build/
 - python 2, from /cvmfs/icecube.opensciencegrid.org/py2-v3.1.1
 - python modules: iminuit, scipy, astropy, OptionParser
