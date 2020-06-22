@@ -91,9 +91,9 @@ def makeDMPDF(mode,channel,profile,systematics,LECut,HECut,mass,nOversampling=-1
     psi_reco = np.array([])
 
     
-    for fileType in allFiles[systematics].keys():
+    for fileType in allFiles['MC'][systematics].keys():
 
-        fileData = np.load(allFiles[systematics][fileType]).item()
+        fileData = np.load(allFiles['MC'][systematics][fileType]).item()
 
         tmp_weight = np.array(fileData['all weight'])[:,0]
         tmp_nu_type = np.array(fileData['all weight'])[:,1]
@@ -201,7 +201,7 @@ def makeBkgPDF(MCtype,systematics,LECut,HECut):
     
     if 'corsika' == MCtype:
         
-        fileData = np.load(allFiles['corsika']).item()
+        fileData = np.load(allFiles['MC']['corsika']).item()
 
         weight = np.append(weight,fileData['all weight'])
         energy_reco = np.append(energy_reco,fileData['all']['energy_rec'])
@@ -215,9 +215,9 @@ def makeBkgPDF(MCtype,systematics,LECut,HECut):
 
     else: 
 
-        for fileType in allFiles[systematics].keys():
+        for fileType in allFiles['MC'][systematics].keys():
 
-            fileData = np.load(allFiles[systematics][fileType]).item()
+            fileData = np.load(allFiles['MC'][systematics][fileType]).item()
 
             tmp_weight = np.array(fileData['all weight'])[:,0]
             tmp_nu_type = np.array(fileData['all weight'])[:,1]
@@ -231,7 +231,7 @@ def makeBkgPDF(MCtype,systematics,LECut,HECut):
             tmp_zenith_true = np.array(fileData['all']['zenith_true'])
 
             BDTScore_LE = np.array(fileData['all']['BDTScore_bb100'])
-            BDTScore_HE = np.array(fileData['all']['BDTScore_ww300'])
+            BDTScore_HE = np.array(fileData['all']['BDTScore_ww299'])
 
             tmp_weight[BDTScore_LE<LECut] = 0.
             tmp_weight[BDTScore_HE<HECut] = 0.
@@ -283,7 +283,7 @@ def makeBkgPDF(MCtype,systematics,LECut,HECut):
 # produce requested PDFs
 #######################        
 
-if systematicSet not in allFiles.keys():
+if systematicSet not in allFiles['MC'].keys():
     if systematicSet not in astro_gamma.keys():
         print 'Systematic variation not defined! Exit.'
         sys.exit()
