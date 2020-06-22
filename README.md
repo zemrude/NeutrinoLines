@@ -1,7 +1,9 @@
 # Analysis-IC86-BSM-DarkMatter-NeutrinoLine
 Analysis code for the search of decaying and annihilating dark matter with focus on neutrino lines
 
-Location: `/data/ana/BSM/HT_Cascade/FinalAnalysisCode/`
+File location: `/data/ana/BSM/HT_Cascade/FinalAnalysisCode/`
+
+More details are on the wiki page: https://wiki.icecube.wisc.edu/index.php/Whole_sky_Dark_Matter_analysis_using_Low_Energy_Cascades_with_IC86-V
 
 ## Code/File structure:
 - README.md : this file
