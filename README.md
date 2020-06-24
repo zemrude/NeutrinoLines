@@ -54,8 +54,7 @@ More details are on the wiki page: https://wiki.icecube.wisc.edu/index.php/Whole
     - `-c channel` (for signal only)
     - `-m mass` (for signal only)
     - `-o oversampling` (for signal only)
-  - plot_Sensitivities.py : plot sensitivities
-    - tbd
+  - plot_Sensitivities.py : plot all ensitivity plots from the wiki page. No arguments needed.
   - plot_ControlDistributions.py : plot pre-Unblinding control distribution and perform goddness of fit tests
 
 - submit : sample scripts for condor/dagman submission
