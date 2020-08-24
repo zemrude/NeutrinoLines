@@ -1,39 +1,70 @@
-from __future__ import division
 import numpy as np
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
+import matplotlib.patches as patches
+
 import pickle
 import sys, os
 
-if sys.version_info >= (3, 5):
-    from math import gcd
-else:
-    from fractions import gcd
-    
+import math
+
+from scipy.stats import chisquare, distributions, chi2
+from scipy.interpolate import interp1d
+
 from iminuit import Minuit
 import scipy.special as sps
-
-from scipy.stats import chisquare, distributions
 
 from optparse import OptionParser
 
 
 ###############################
 
-def model_array(n1,n2,n3):
-    return n1*tab_events_corsika + n2*tab_events_atm + n3*tab_events_astro
+samples = ['LE','HE']
 
-def model_array_quad(n1,n2,n3):
-    return n1**2*tabquad_events_corsika + n2**2*tabquad_events_atm + n3**2*tabquad_events_astro
+base_path = os.environ['ANALYSIS_BASE_PATH']
+sys.path.append(base_path+'plotting')
 
-def LLH(n1,n2,n3):
-         
-    k      = observation
-    mu     = model_array(n1,n2,n3)
+import style
+style.SetFigureStyle()
+latex = style.latex
+style.increaseAxisText(6)
+
+plt.rcParams.update({'figure.dpi': 200.})
+
+livetime = {}
+livetime['Burnsample'] = 1116125.821572
+livetime['Data'] = 28272940. + 30674072. + 31511810.5 + 31150852. + 30059465.  
+
+bins_vars={
+    'energy_rec':np.logspace(1,5,24+1),
+    'psi_rec':np.linspace(0.,np.pi,18+1),
+}
+
+cutValueString = {'LE': 'LEBDT0.15_HEBDT0.2' , 'HE': 'LEBDT-1.0_HEBDT0.3'}
+
+systematics = ['nominal','DomEffUp','DomEffDown','Ice_HoleIce100_ScatAbs-7','Ice_HoleIce100_Scat+10','Ice_HoleIce100_Abs+10',
+              'Ice_HoleIce30_ScatAbs-7','Ice_HoleIce30_Scat+10','Ice_HoleIce30_Abs+10','nominalGammaUp','nominalGammaDown']
+
+psiCut = np.pi/2.
+
+###############################
+
+def LLH(n1,n2,n3,syst):
+    
+    s = systematics[int(syst)]
+    
+    k      = np.append(tab_events_data_energy,tab_events_data_psi)
+    mu     = np.append(
+        n1*tab_events_corsika_energy + n2*tab_events_atm_energy[s] + n3*tab_events_astro_energy[s],
+        n1*tab_events_corsika_psi + n2*tab_events_atm_psi[s] + n3*tab_events_astro_psi[s],
+    )
     mu2    = np.power(mu,2)
-    sigma2 = model_array_quad(n1,n2,n3)
+    sigma2 = np.append(
+        n1**2*tabquad_events_corsika_energy + n2**2*tabquad_events_atm_energy[s] + n3**2*tabquad_events_astro_energy[s],
+        n1**2*tabquad_events_corsika_psi + n2**2*tabquad_events_atm_psi[s] + n3**2*tabquad_events_astro_psi[s]
+    )
   
     bins_to_use = (k>0.)&(sigma2>0.)
     
@@ -50,238 +81,366 @@ def LLH(n1,n2,n3):
         ]
     
     return -np.sum(values)
-    
-    
-def _compute_prob_inside_method(m, n, g, h):
-    """
-    Count the proportion of paths that stay strictly inside two diagonal lines.
-    Parameters
-    ----------
-    m : integer
-        m > 0
-    n : integer
-        n > 0
-    g : integer
-        g is greatest common divisor of m and n
-    h : integer
-        0 <= h <= lcm(m,n)
-    Returns
-    -------
-    p : float
-        The proportion of paths that stay inside the two lines.
-    Count the integer lattice paths from (0, 0) to (m, n) which satisfy
-    |x/m - y/n| < h / lcm(m, n).
-    The paths make steps of size +1 in either positive x or positive y directions.
-    We generally follow Hodges' treatment of Drion/Gnedenko/Korolyuk.
-    Hodges, J.L. Jr.,
-    "The Significance Probability of the Smirnov Two-Sample Test,"
-    Arkiv fiur Matematik, 3, No. 43 (1958), 469-86.
-    
-    """
-    # Probability is symmetrical in m, n.  Computation below uses m >= n.
-    if m < n:
-        m, n = n, m
-    mg = m // g
-    ng = n // g
 
-    # Count the integer lattice paths from (0, 0) to (m, n) which satisfy
-    # |nx/g - my/g| < h.
-    # Compute matrix A such that:
-    #  A(x, 0) = A(0, y) = 1
-    #  A(x, y) = A(x, y-1) + A(x-1, y), for x,y>=1, except that
-    #  A(x, y) = 0 if |x/m - y/n|>= h
-    # Probability is A(m, n)/binom(m+n, n)
-    # Optimizations exist for m==n, m==n*p.
-    # Only need to preserve a single column of A, and only a sliding window of it.
-    # minj keeps track of the slide.
-    minj, maxj = 0, min(int(np.ceil(h / mg)), n + 1)
-    curlen = maxj - minj
-    # Make a vector long enough to hold maximum window needed.
-    lenA = min(2 * maxj + 2, n + 1)
-    # This is an integer calculation, but the entries are essentially
-    # binomial coefficients, hence grow quickly.
-    # Scaling after each column is computed avoids dividing by a
-    # large binomial coefficent at the end. Instead it is incorporated
-    # one factor at a time during the computation.
-    dtype = np.float64
-    A = np.zeros(lenA, dtype=dtype)
-    # Initialize the first column
-    A[minj:maxj] = 1
-    for i in range(1, m + 1):
-        # Generate the next column.
-        # First calculate the sliding window
-        lastminj, lastmaxj, lastlen = minj, maxj, curlen
-        minj = max(int(np.floor((ng * i - h) / mg)) + 1, 0)
-        minj = min(minj, n)
-        maxj = min(int(np.ceil((ng * i + h) / mg)), n + 1)
-        if maxj <= minj:
-            return 0
-        # Now fill in the values
-        A[0:maxj - minj] = np.cumsum(A[minj - lastminj:maxj - lastminj])
-        curlen = maxj - minj
-        if lastlen > curlen:
-            # Set some carried-over elements to 0
-            A[maxj - minj:maxj - minj + (lastlen - curlen)] = 0
-        # Peel off one term from each of top and bottom of the binomial coefficient.
-        scaling_factor = i * 1.0 / (n + i)
-        A *= scaling_factor
-    return A[maxj - minj - 1]
+
+def cdf_interpolation(data, weight):
+    
+    ix = np.argsort(data)
+    data = data[ix]
+    wei = np.array(weight[ix],dtype=float)
+    
+    cwei = np.cumsum(wei)/np.sum(wei)
+   
+    cdf = interp1d(data, cwei, kind='linear', bounds_error=False, fill_value=(0,1))
+    
+    return cdf
+
 
 def ks_w2(data1, data2, wei1, wei2):
-    ix1 = np.argsort(data1)
-    ix2 = np.argsort(data2)
-    data1 = data1[ix1]
-    data2 = data2[ix2]
-    wei1 = wei1[ix1]
-    wei2 = wei2[ix2]
-    data = np.concatenate([data1, data2])
-    cwei1 = np.hstack([0, np.cumsum(wei1)/sum(wei1)])
-    cwei2 = np.hstack([0, np.cumsum(wei2)/sum(wei2)])
-    cdf1we = cwei1[[np.searchsorted(data1, data, side='right')]]
-    cdf2we = cwei2[[np.searchsorted(data2, data, side='right')]]
+
+    cdf1 = cdf_interpolation(data1, wei1)
+    cdf2 = cdf_interpolation(data2, wei2)
     
-    d = np.max(np.abs(cdf1we - cdf2we))
+    xx = np.linspace(np.min(data1), np.max(data1))
     
-    n1 = int(np.sum(wei1))
-    n2 = int(np.sum(wei2))
+    cdf1we = cdf1(xx)
+    cdf2we = cdf2(xx)
+    cddiffs = cdf1we - cdf2we
     
+    minS = np.clip(-np.min(cddiffs), 0, 1)  # Ensure sign of minS is not negative.
+    maxS = np.max(cddiffs)
+    d = max(minS, maxS)
     
-    g = gcd(n1, n2)
-    n1g = n1 // g
-    n2g = n2 // g
-    prob = -np.inf
+    n1 = int(np.sum(wei1)**2/np.sum(wei1**2))
+    n2 = int(np.sum(wei2)**2/np.sum(wei2**2))
 
-    lcm = (n1 // g) * n2
-    h = int(np.round(d * lcm))
-    d = h * 1.0 / lcm
-    if h == 0:
-        prob = 1.0
-    else:
-        prob = 1 - _compute_prob_inside_method(n1, n2, g, h)
-    
-    return d , prob
-
-
-
-######################################
-
-base_path = os.environ['ANALYSIS_BASE_PATH']
-sys.path.append(base_path+'plotting')
-
-import style
-style.SetFigureStyle()
-latex = style.latex
-style.increaseAxisText(6)
-
-plt.rcParams.update({'figure.dpi': 200.})
-
-burnsampleTime = 1116125.821572
-
-for variable in ['energy_rec','psi_rec']:
-    
-    
-    fig,(ax1,ax2) = plt.subplots(1,2,figsize=(20,8))
-    
-    cutValueString = {'LE': 'LEBDT0.15_HEBDT0.2' , 'HE': 'LEBDT-1.0_HEBDT0.3'}
-    for s in ['LE','HE']:
+    n_eff = (n1 * n2 / (n1 + n2))
+        
+    return d , sps.kolmogorov(np.sqrt(n_eff)*d)
        
-        infile = base_path+'controlDistributions/Histograms_'+cutValueString[s]+'_PSI90degrees.pkl' 
-        data = pickle.load(open(infile,'r'))
 
-        # load histograms
-        tab_events_atm    = data['histograms']['atm'][variable][0]*burnsampleTime
-        tab_events_astro  = data['histograms']['astro'][variable][0]*burnsampleTime
-        tab_events_corsika  = data['histograms']['corsika'][variable][0]*burnsampleTime
-        tabquad_events_atm   = data['histograms']['corsika'][variable+'_quad'][0]*burnsampleTime*burnsampleTime
-        tabquad_events_astro = data['histograms']['corsika'][variable+'_quad'][0]*burnsampleTime*burnsampleTime
-        tabquad_events_corsika = data['histograms']['corsika'][variable+'_quad'][0]*burnsampleTime*burnsampleTime
+for Datatype in ['Data']:#,'Burnsample']:
 
-        observation = data['histograms']['Burnsample'][variable][0]
+    for sample in samples:
+        infile = base_path+'/controlDistributions/ControlDistributions_unbinned_syst_'+cutValueString[sample]+'.pkl' 
 
-        # fit background only
-        LLHmin=Minuit(LLH,
-                 n1=1.,n2=1.,n3=1.,
-                 error_n1=.1,error_n2=.1,error_n3=.1,
-                 limit_n1=(0.,2.),limit_n2=(0.,2.),limit_n3=(0.,2.),
-                 errordef=.5,print_level=0)  
-        LLHmin.migrad()
+        with open(infile, 'rb') as f:
+            data = pickle.load(f)#, encoding="latin1") 
 
-        bestFit = {}
-        bestFit['n1']=LLHmin.fitarg['n1']
-        bestFit['n2']=LLHmin.fitarg['n2']
-        bestFit['n3']=LLHmin.fitarg['n3']
-        bestFit['LLH']=LLH(bestFit['n1'],bestFit['n2'],bestFit['n3'])
-        
-        #load unbinned data
-        d_burnsample = data['unbinned_data']['Burnsample']['energy_rec']
-        weight_burnsample = np.array([1]*len(data['unbinned_data']['Burnsample']['energy_rec']))
+            d_corsika_energy = data['unbinned_data']['corsika']['energy_rec']
+            d_corsika_psi = data['unbinned_data']['corsika']['psi_rec']
 
-        d_corskia = data['unbinned_data']['corsika']['energy_rec']
-        d_atm = data['unbinned_data']['atm']['energy_rec']
-        d_astro = data['unbinned_data']['astro']['energy_rec']
+            d_corsika_energy = d_corsika_energy[d_corsika_psi>psiCut]
+            d_corsika_weight_energy = data['unbinned_data']['corsika']['weight'][d_corsika_psi>psiCut]
+            d_corsika_weight_psi = data['unbinned_data']['corsika']['weight']
 
-        weight_corskia = data['unbinned_data']['corsika']['weight']
-        weight_atm = data['unbinned_data']['atm']['weight']
-        weight_astro = data['unbinned_data']['astro']['weight']
+            d_atm_energy = {}
+            d_atm_psi = {}
+            d_atm_weight = {}
 
-        bkg = np.append(d_corskia, d_atm)
-        bkg = np.append(bkg, d_astro)
-        bkg_weight = np.append(bestFit['n1']*weight_corskia*burnsampleTime, bestFit['n2']*weight_atm*burnsampleTime)
-        bkg_weight = np.append(bkg_weight, bestFit['n3']*weight_astro*burnsampleTime)
+            d_astro_energy = {}
+            d_astro_psi = {}
+            d_astro_weight = {}
 
-        # calculate p-values
-        # 1) weighted two-sample KS
-        ks_test = ks_w2(d_burnsample, bkg, weight_burnsample, bkg_weight)
+            for s in systematics:
 
-        # 2) chi^2
-        expectation = tab_events_corsika+tab_events_atm+tab_events_astro
-        chi2_test = chisquare(observation[expectation>0.], expectation[expectation>0.])
-        
-        # plot
-        h_burnsample = data['histograms']['Burnsample'][variable][0]
-        bins = data['histograms']['Burnsample'][variable][1]
-        binCenters = bins[:-1]+np.diff(bins)/2.
-        if variable == 'psi_rec':
-            binCenters = binCenters *180/np.pi
+                d_atm_energy[s] = data['unbinned_data']['atm'][s]['energy_rec']
+                d_atm_psi[s] = data['unbinned_data']['atm'][s]['psi_rec']
+                d_atm_weight[s] = data['unbinned_data']['atm'][s]['weight']
+
+                d_astro_energy[s] = data['unbinned_data']['astro'][s]['energy_rec']
+                d_astro_psi[s] = data['unbinned_data']['astro'][s]['psi_rec']
+                d_astro_weight[s] = data['unbinned_data']['astro'][s]['weight']
+
+            d_data_energy = data['unbinned_data'][Datatype]['energy_rec']
+            d_data_psi = data['unbinned_data'][Datatype]['psi_rec']
+
+            d_data_energy = d_data_energy[d_data_psi>psiCut]
+            d_data_psi = d_data_psi[d_data_psi>psiCut]
             
-        h_atm = data['histograms']['atm'][variable][0]
-        h_corsika = data['histograms']['corsika'][variable][0]
-        h_astro = data['histograms']['astro'][variable][0]
-        h_bkg = bestFit['n2']*h_atm + bestFit['n1']*h_corsika + bestFit['n3']*h_astro
+            d_data_weight = np.array([[1]*len(d_data_psi)])
 
-        if s == 'LE':
-            ax = ax1
-        else:
-            ax = ax2
+
+            ##### do histograms
+
+            tab_events_corsika_energy = np.histogram(d_corsika_energy.flatten(),bins=bins_vars['energy_rec'],weights = d_corsika_weight_energy*livetime[Datatype])[0]
+            tab_events_corsika_psi = np.histogram(d_corsika_psi[d_corsika_psi>psiCut],bins=bins_vars['psi_rec'],weights = d_corsika_weight_psi[d_corsika_psi.flatten()>psiCut]*livetime[Datatype])[0]
+
+
+            tabquad_events_corsika_energy = np.histogram(d_corsika_energy.flatten(),bins=bins_vars['energy_rec'],weights = (d_corsika_weight_energy*livetime[Datatype])**2)[0]
+            tabquad_events_corsika_psi = np.histogram(d_corsika_psi[d_corsika_psi>psiCut],bins=bins_vars['psi_rec'],weights = (d_corsika_weight_psi[d_corsika_psi.flatten()>psiCut]*livetime[Datatype])**2)[0]
+
+            tab_events_atm_energy = {}
+            tab_events_atm_psi = {}
+            tab_events_astro_energy = {}
+            tab_events_astro_psi = {}
+            tabquad_events_atm_energy = {}
+            tabquad_events_atm_psi = {}
+            tabquad_events_astro_energy = {}
+            tabquad_events_astro_psi = {}
+
+            for s in systematics:
+
+                tab_events_atm_energy[s] = np.histogram(d_atm_energy[s][(d_atm_psi[s])>psiCut],bins=bins_vars['energy_rec'],weights = d_atm_weight[s][(d_atm_psi[s])>psiCut]*livetime[Datatype])[0]
+                tab_events_atm_psi[s] = np.histogram(d_atm_psi[s][(d_atm_psi[s])>psiCut],bins=bins_vars['psi_rec'],weights = d_atm_weight[s][(d_atm_psi[s])>psiCut]*livetime[Datatype])[0]
+
+                tab_events_astro_energy[s] = np.histogram(d_astro_energy[s][d_astro_psi[s]>psiCut],bins=bins_vars['energy_rec'],weights = d_astro_weight[s][d_astro_psi[s]>psiCut]*livetime[Datatype])[0]
+                tab_events_astro_psi[s] = np.histogram(d_astro_psi[s][d_astro_psi[s]>psiCut],bins=bins_vars['psi_rec'],weights = d_astro_weight[s][d_astro_psi[s]>psiCut]*livetime[Datatype])[0]
+
+                tabquad_events_atm_energy[s] = np.histogram(d_atm_energy[s][d_atm_psi[s]>psiCut],bins=bins_vars['energy_rec'],weights = np.power(d_atm_weight[s][d_atm_psi[s]>psiCut]*livetime[Datatype],2))[0]
+                tabquad_events_atm_psi[s] = np.histogram(d_atm_psi[s][d_atm_psi[s]>psiCut],bins=bins_vars['psi_rec'],weights = d_atm_weight[s][d_atm_psi[s]>psiCut]*livetime[Datatype]*d_atm_weight[s][d_atm_psi[s]>psiCut]*livetime[Datatype])[0]
+
+                tabquad_events_astro_energy[s] = np.histogram(d_astro_energy[s][d_astro_psi[s]>psiCut],bins=bins_vars['energy_rec'],weights = d_astro_weight[s][d_astro_psi[s]>psiCut]*livetime[Datatype]*d_astro_weight[s][d_astro_psi[s]>psiCut]*livetime[Datatype])[0]
+                tabquad_events_astro_psi[s] = np.histogram(d_astro_psi[s][d_astro_psi[s]>psiCut],bins=bins_vars['psi_rec'],weights = d_astro_weight[s][d_astro_psi[s]>psiCut]*livetime[Datatype]*d_astro_weight[s][d_astro_psi[s]>psiCut]*livetime[Datatype])[0]
+
+
+            tab_events_data_energy, bins_energy = np.histogram(d_data_energy[d_data_psi>psiCut],bins=bins_vars['energy_rec'])
+            tab_events_data_psi, bins_psi = np.histogram(d_data_psi[d_data_psi>psiCut],bins=bins_vars['psi_rec'])
+
+            binCenters_energy = bins_energy[:-1]+np.diff(bins_energy)/2.
+            binCenters_psi = bins_psi[:-1]+np.diff(bins_psi)/2.
+            binCenters_psi = binCenters_psi*180/np.pi
+
+
+            # fit background only
+
+            bestFit = {}
+
+            for iSyst in range(len(systematics)):
+
+                bestFit[systematics[iSyst]] = {}
+
+                LLHmin=Minuit(LLH,
+                                     n1=1.,n2=1.,n3=1.,
+                                     error_n1=.1,error_n2=.1,error_n3=.1,
+                                     syst = iSyst, fix_syst = True,
+                                     limit_n1=(0.,2.),limit_n2=(0.,2.),limit_n3=(0.,2.),
+                                     errordef=.5,print_level=0)
+                LLHmin.migrad()
+
+                bestFit[systematics[iSyst]]['n1']=LLHmin.fitarg['n1']
+                bestFit[systematics[iSyst]]['n2']=LLHmin.fitarg['n2']
+                bestFit[systematics[iSyst]]['n3']=LLHmin.fitarg['n3']
+                bestFit[systematics[iSyst]]['LLH']=LLH(bestFit[systematics[iSyst]]['n1'],bestFit[systematics[iSyst]]['n2'],bestFit[systematics[iSyst]]['n3'],iSyst)
+
+
+            ###### 
+            d_bkg_energy = {}
+            d_bkg_weight_energy = {}
+            d_bkg_psi = {}
+            d_bkg_weight_psi = {}
+
+            for s in systematics:
+                d_bkg_energy[s] = np.append(d_corsika_energy, d_atm_energy[s][d_atm_psi[s]>psiCut])
+                d_bkg_weight_energy[s] = np.append(bestFit[s]['n1']*d_corsika_weight_energy*livetime[Datatype], bestFit[s]['n2']*d_atm_weight[s][d_atm_psi[s]>psiCut]*livetime[Datatype]+bestFit[s]['n3']*d_astro_weight[s][d_astro_psi[s]>psiCut]*livetime[Datatype])
+
+                d_bkg_psi[s] = np.append(d_corsika_psi[d_corsika_psi>psiCut], d_atm_psi[s][d_atm_psi[s]>psiCut])
+                d_bkg_weight_psi[s] = np.append(bestFit[s]['n1']*d_corsika_weight_psi[d_corsika_psi.flatten()>psiCut]*livetime[Datatype], bestFit[s]['n2']*d_atm_weight[s][d_atm_psi[s]>psiCut]*livetime[Datatype]+bestFit[s]['n3']*d_astro_weight[s][d_astro_psi[s]>psiCut]*livetime[Datatype])
+
+            #################
+            h_bkg_energy = {}
+            h_bkg_psi = {}
+            for s in systematics:
+                h_bkg_energy[s] = bestFit[s]['n2']*tab_events_atm_energy[s]/livetime[Datatype] + bestFit[s]['n1']*tab_events_corsika_energy/livetime[Datatype] + bestFit[s]['n3']*tab_events_astro_energy[s]/livetime[Datatype]
+
+                h_bkg_psi[s] = bestFit[s]['n2']*tab_events_atm_psi[s]/livetime[Datatype] + bestFit[s]['n1']*tab_events_corsika_psi/livetime[Datatype] + bestFit[s]['n3']*tab_events_astro_psi[s]/livetime[Datatype]
+
+            h_bkg_energy_syst_min = np.array([])    
+            h_bkg_energy_syst_max = np.array([]) 
+            for i in range(len(h_bkg_energy['nominal'])):
+                h_bkg_energy_syst_min = np.append(h_bkg_energy_syst_min, np.min([h_bkg_energy[s][i] for s in systematics]))
+                h_bkg_energy_syst_max = np.append(h_bkg_energy_syst_max, np.max([h_bkg_energy[s][i] for s in systematics]))
+
+            h_bkg_psi_syst_min = np.array([])    
+            h_bkg_psi_syst_max = np.array([]) 
+            for i in range(len(h_bkg_psi['nominal'])):
+                h_bkg_psi_syst_min = np.append(h_bkg_psi_syst_min, np.min([h_bkg_psi[s][i] for s in systematics]))
+                h_bkg_psi_syst_max = np.append(h_bkg_psi_syst_max, np.max([h_bkg_psi[s][i] for s in systematics]))
+
+            # calculate p-values
+            # 1) weighted two-sample KS
+
+            KS_pValues_energy = []
+            KS_pValues_psi = []
             
-        ax.errorbar(binCenters, h_burnsample/burnsampleTime, np.sqrt(h_burnsample)/burnsampleTime, xerr=None, color='k', marker='o',markersize=2, lw=2, zorder=10, ls=None, label='Burnsample ({} events)'.format(len(d_burnsample)))
+            for s in systematics:                
+                KS_pValues_energy.append( ks_w2(np.log10(d_data_energy), np.log10(d_bkg_energy[s]), d_data_weight.flatten(), d_bkg_weight_energy[s])[1])
+                KS_pValues_psi.append(ks_w2(d_data_psi, d_bkg_psi[s], d_data_weight.flatten(), d_bkg_weight_psi[s])[1])
+            
+            # 2) chi^2
+            expectation_energy = bestFit['nominal']['n1']*tab_events_corsika_energy+bestFit['nominal']['n2']*tab_events_atm_energy['nominal']+bestFit['nominal']['n3']*tab_events_astro_energy['nominal']
+            expectation_energy = np.rint(expectation_energy)
 
-        ax.step(binCenters,bestFit['n1']*h_corsika,where='mid',color = 'orange', label='Corsika', alpha = 0.5, lw=2)
-        ax.step(binCenters,bestFit['n2']*h_atm,where='mid',color = 'g', label=r'Atmosperic $\nu$', alpha = 0.5, lw=2)
-        ax.step(binCenters,bestFit['n3']*h_astro,where='mid',color = 'b', label=r'Astrophysical $\nu$', alpha = 0.5, lw=2)
-        ax.step(binCenters,h_bkg,where='mid',color = 'r', label='Combined background', lw=3)
+            expectation_psi = bestFit['nominal']['n1']*tab_events_corsika_psi+bestFit['nominal']['n2']*tab_events_atm_psi['nominal']+bestFit['nominal']['n3']*tab_events_astro_psi['nominal']
+            expectation_psi = np.rint(expectation_psi)
 
-        ax.plot(0,0,lw=0,label='KS p-value: {:.3f}'.format(ks_test[1]),zorder=100)
-        ax.plot(0,0,lw=0,label=r'Pearson $\chi^2$ p-value: {:.3f}'.format(chi2_test[1]),zorder=200)
+            chi2_syst_energy = np.sum(
+
+                       ( (tab_events_data_energy[expectation_energy>0.] - expectation_energy[expectation_energy>0.]) **2 )
+
+                        / 
+
+                       (
+                          (((h_bkg_energy_syst_max[expectation_energy>0.] - h_bkg_energy_syst_min[expectation_energy>0.])
+                           *livetime[Datatype] ) **2  )
+                           +  expectation_energy[expectation_energy>0.]
+                       )
+                    )
+            p_syst_energy = distributions.chi2.sf(chi2_syst_energy, len(expectation_energy[expectation_energy>0.]) - 1)
+
+            chi2_syst_psi = np.sum(
+                        ( (tab_events_data_psi[expectation_psi>0.] - expectation_psi[expectation_psi>0.]) **2)
+                    /
+
+                    (
+                       (((h_bkg_psi_syst_max[expectation_psi>0.] - h_bkg_psi_syst_min[expectation_psi>0.])
+                         *livetime[Datatype] ) **2 )
+                        + expectation_psi[expectation_psi>0.]
+                    )
+                 )
+            p_syst_psi = distributions.chi2.sf(chi2_syst_psi, len(expectation_psi[expectation_psi>0.]) - 1)
+
+
+
+            #################
+            #################
+            #################
+
+            fig,(ax1,ax2) = plt.subplots(1,2,figsize=(20,8))
+
+            
+            #################
+            ax1.errorbar(binCenters_energy, tab_events_data_energy/livetime[Datatype], np.sqrt(tab_events_data_energy)/livetime[Datatype], xerr=None, color='k', marker='o',markersize=2, lw=2, zorder=10, ls=None, label=Datatype+' ({} events)'.format(len(d_data_energy)))
+
+            #ax.step(binCenters_energy,bestFit_energy['n1']*h_corsika,label='Original Corsika',where='mid',color='magenta',lw=1)
+            ax1.step(binCenters_energy,bestFit['nominal']['n3']*tab_events_astro_energy['nominal']/livetime[Datatype],where='mid',color = 'b', label=r'Astrophysical $\nu$', alpha = 0.5, lw=2)
+            ax1.step(binCenters_energy,bestFit['nominal']['n2']*tab_events_atm_energy['nominal']/livetime[Datatype],where='mid',color = 'g', label=r'Atmosperic $\nu$', alpha = 0.5, lw=2)
+            ax1.step(binCenters_energy,bestFit['nominal']['n1']*tab_events_corsika_energy/livetime[Datatype],where='mid',color = 'orange', label='Corsika', alpha = 0.5, lw=2)
+
+            ax1.fill_between(binCenters_energy, h_bkg_energy_syst_min, h_bkg_energy_syst_max, step='mid',color='r',alpha=0.5,lw=0)
+            p2 = patches.Patch(color='r', alpha=0.5, linewidth=0)
+
+            p1,= ax1.step(binCenters_energy,h_bkg_energy['nominal'],where='mid',color = 'r', lw=3)
+
+            ax1.plot(0,0,lw=0,label='KS p-value: {:.3f}'.format(max(KS_pValues_energy)),zorder=100)
+            ax1.plot(0,0,lw=0,label=r'Pearson $\chi^2$ p-value: {:.3f}'.format(p_syst_energy),zorder=200)
+
+            handles, labels = ax1.get_legend_handles_labels()
+            handles.append((p2,p1))
+            labels.append(r'Combined background')
+            
+            order = [5,4,3,6,2,1,0]
+            leg = ax1.legend([handles[idx] for idx in order], [labels[idx] for idx in order], frameon = 1, fancybox=False, loc='upper right')
+
+            ax1.set_xlabel(r"E$_{\mathrm{reco}}$ (GeV)")
+            ax1.set_xscale('log')
+            ax1.set_xlim(1e1,1e5)
+            ax1.set_ylim(1e-9,1e-4)
+            ax1.set_ylabel(r"rate (Hz)")
+            ax1.set_yscale('log')
+
+
+            #################
+                        
+            ax2.errorbar(binCenters_psi, tab_events_data_psi/livetime[Datatype], np.sqrt(tab_events_data_psi)/livetime[Datatype], xerr=None, color='k', marker='o',markersize=2, lw=2, zorder=10, ls=None, label=Datatype+' ({} events)'.format(len(d_data_psi)))
+
+            #ax.step(binCenters_psi,bestFit_energy['n1']*h_corsika,label='Original Corsika',where='mid',color='magenta',lw=1)
+            ax2.step(binCenters_psi,bestFit['nominal']['n3']*tab_events_astro_psi['nominal']/livetime[Datatype],where='mid',color = 'b', label=r'Astrophysical $\nu$', alpha = 0.5, lw=2)
+            ax2.step(binCenters_psi,bestFit['nominal']['n2']*tab_events_atm_psi['nominal']/livetime[Datatype],where='mid',color = 'g', label=r'Atmosperic $\nu$', alpha = 0.5, lw=2)
+            ax2.step(binCenters_psi,bestFit['nominal']['n1']*tab_events_corsika_psi/livetime[Datatype],where='mid',color = 'orange', label='Corsika', alpha = 0.5, lw=2)
+
+            ax2.fill_between(binCenters_psi, h_bkg_psi_syst_min, h_bkg_psi_syst_max, step='mid',color='r',alpha=0.5,lw=0)
+            p3 = patches.Patch(color='r', alpha=0.5, linewidth=0)
+            p4, = ax2.step(binCenters_psi,h_bkg_psi['nominal'],where='mid',color = 'r', lw=3)
+
+            ax2.plot(0,0,lw=0,label='KS p-value: {:.3f}'.format(max(KS_pValues_psi)),zorder=100)
+            ax2.plot(0,0,lw=0,label=r'Pearson $\chi^2$ p-value: {:.3f}'.format(p_syst_psi),zorder=200)
+            
+            handles, labels = ax2.get_legend_handles_labels()
+            handles.append((p4,p3))
+            labels.append(r'Combined background')
+                                 
+            order = [5,4,3,6,2,1,0]
+                     
+            leg = ax2.legend([handles[idx] for idx in order], [labels[idx] for idx in order],frameon = 1, fancybox=False, loc='upper left')
+
+            ax2.set_xlabel(r"$\Psi_{\mathrm{reco}}$ (degrees)")
+            ax2.set_xlim(0,180)
+            ax2.set_ylim(1e-7,1e-4)
+            ax2.set_ylabel(r"rate (Hz)")
+            ax2.set_yscale('log')
+
+            fig.suptitle(sample+r' Sample ($\Psi_{\mathrm{reco}}$>'+str(int(psiCut/np.pi*180))+'$^\circ$); '+
+                         r'$n_{\mu}$='+'{:.3f}, '.format(bestFit['nominal']['n1'])+
+                         r'$n_{\nu}^{atm}$='+'{:.3f}, '.format(bestFit['nominal']['n2'])+
+                         r'$n_{\nu}^{ast}$='+'{:.3f}, '.format(bestFit['nominal']['n3'])
+                         ,fontsize=24)
+
+            fig.savefig('plots/PreUnblinding_ControlDistribution_'+Datatype+'_'+sample+'-Sample.png',bbox='tight')
+            fig.savefig('plots/PreUnblinding_ControlDistribution_'+Datatype+'_'+sample+'-Sample.pdf',bbox='tight')
+
+
+            #################
+
+
+            fig2,(ax_cdf1,ax_cdf2) = plt.subplots(1,2,figsize=(20,8))
+
+            xx_e = np.linspace(0,5,10000)
+            xx_psi = np.linspace(0,np.pi,10000)
+            
+            
+            cdf_energy = {}
+            cdf_psi = {}
+            for s in systematics:
+                cdf_energy[s] = cdf_interpolation(np.log10(d_bkg_energy[s]), d_bkg_weight_energy[s])(xx_e)
+                cdf_psi[s] = cdf_interpolation(d_bkg_psi[s], d_bkg_weight_psi[s])(xx_psi)
+            
+            cdf_energy_syst_min = np.array([])    
+            cdf_energy_syst_max = np.array([]) 
+            for i in range(len(xx_e)):
+                cdf_energy_syst_min = np.append(cdf_energy_syst_min, np.min([cdf_energy[s][i] for s in systematics]))
+                cdf_energy_syst_max = np.append(cdf_energy_syst_max, np.max([cdf_energy[s][i] for s in systematics]))
+
+            cdf_psi_syst_min = np.array([])    
+            cdf_psi_syst_max = np.array([]) 
+            for i in range(len(xx_psi)):
+                cdf_psi_syst_min = np.append(cdf_psi_syst_min, np.min([cdf_psi[s][i] for s in systematics]))
+                cdf_psi_syst_max = np.append(cdf_psi_syst_max, np.max([cdf_psi[s][i] for s in systematics]))
+
+                
+                
+            p1, = ax_cdf1.plot(10**xx_e,cdf_energy['nominal'],color='r',lw=2)        
+            ax_cdf1.fill_between(10**xx_e, cdf_energy_syst_min, cdf_energy_syst_max, step='mid',color='r',alpha=0.5,lw=0)
+            p2 = patches.Patch(color='r', alpha=0.5, linewidth=0)
     
-        handles, labels = ax.get_legend_handles_labels()
-        
-        if variable == 'energy_rec':
-            ax.set_xlabel(r"E$_{\mathrm{reco}}$ (GeV)")
-            ax.set_xscale('log')
-            ax.set_xlim(1e1,1e5)
-            leg = ax.legend(handles[::-1], labels[::-1],frameon = 1, fancybox=False, loc='upper right')
+            ax_cdf2.plot(xx_psi*180/np.pi,cdf_psi['nominal'],color='r',lw=2)
+            ax_cdf2.fill_between(xx_psi*180/np.pi, cdf_psi_syst_min, cdf_psi_syst_max, step='mid',color='r',alpha=0.5,lw=0)
 
-        if variable == 'psi_rec':
-            ax.set_xlabel(r"$\Psi_{\mathrm{reco}}$ (degrees)")
-            ax.set_xlim(0,180)
-            leg = ax.legend(handles[::-1], labels[::-1],frameon = 1, fancybox=False, loc='lower left')
+            cdf_data_energy = cdf_interpolation(np.log10(d_data_energy), d_data_weight.flatten() )(xx_e)
+            cdf_data_psi = cdf_interpolation(d_data_psi, d_data_weight.flatten() )(xx_psi)
+
+            ax_cdf1.plot(10**xx_e,cdf_data_energy,color='k',lw=2,label='Data')
+            ax_cdf2.plot(xx_psi*180/np.pi,cdf_data_psi,color='k',lw=2,label='Data')
+
+            ax_cdf1.set_xlabel(r"E$_{\mathrm{reco}}$ (GeV)")
+            ax_cdf1.set_xscale('log')
+            ax_cdf1.set_xlim(1e0,1e5)
+            ax_cdf1.set_ylim(0,1)
+            ax_cdf1.set_ylabel(r"CDF")
+
+            ax_cdf2.set_xlabel(r"$\Psi_{\mathrm{reco}}$ (degrees)")
+            ax_cdf2.set_xlim(0,180)
+            ax_cdf2.set_ylim(0,1)
+            ax_cdf2.set_ylabel(r"CDF")
+
+            handles, labels = ax_cdf2.get_legend_handles_labels()
+            handles.append((p2,p1))
+            labels.append(r'Combined background')
             
-        ax.set_ylim(1e-8,1e-4)
-        ax.set_ylabel(r"rate (Hz)")
-        ax.set_yscale('log')
-        ax.set_title(s+r' Sample ($\Psi_{\mathrm{reco}}$>90$^\circ$)')
-    
+            leg1 = ax_cdf1.legend(handles, labels,frameon = 1, fancybox=False, loc='upper left')
+            leg2 = ax_cdf2.legend(handles, labels,frameon = 1, fancybox=False, loc='upper left')
+            
+            fig2.suptitle(sample+r' Sample ($\Psi_{\mathrm{reco}}$>'+str(int(psiCut/np.pi*180))+'$^\circ$)' ,fontsize=24)
 
-    fig.savefig('plots/PreUnblinding_ControlDistribution_'+variable+'.png',bbox='tight')
-    fig.savefig('plots/PreUnblinding_ControlDistribution_'+variable+'.pdf',bbox='tight')
+            fig2.savefig('plots/PreUnblinding_ControlDistribution_'+Datatype+'_'+sample+'-Sample_CDF.pdf',bbox='tight')
+            fig2.savefig('plots/PreUnblinding_ControlDistribution_'+Datatype+'_'+sample+'-Sample_CDF.png',bbox='tight')
