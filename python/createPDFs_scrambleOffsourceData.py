@@ -1,5 +1,5 @@
-#!/bin/sh /cvmfs/icecube.opensciencegrid.org/py2-v3.1.1/icetray-start
-#METAPROJECT /data/user/sbaur/metaprojects/icerec/build/
+#!/bin/sh /cvmfs/icecube.opensciencegrid.org/py3-v4.1.1/icetray-start
+#METAPROJECT /data/user/aguilar/icetray/meta-projects/combo/V01-00-02/build
 
 from time import gmtime, strftime
 import numpy as np
@@ -13,17 +13,19 @@ from icecube import astro
 import pickle
 from optparse import OptionParser
 
-source = 'source /data/ana/BSM/HT_Cascade/FinalAnalysisCode/env.sh'
-dump = '/usr/bin/python -c "import os,pickle;print pickle.dumps(os.environ)"'
-penv = os.popen('%s && %s' %(source,dump))
-env = pickle.loads(penv.read())
-os.environ = env
+import env
+
+#source = 'source /data/ana/BSM/HT_Cascade/FinalAnalysisCode/env.sh'
+#dump = '/usr/bin/python -c "import os,pickle;print pickle.dumps(os.environ)"'
+#penv = os.popen('%s && %s' %(source,dump))
+#env = pickle.loads(penv.read())
+#os.environ = env
 
 base_path = os.environ['ANALYSIS_BASE_PATH']
 sys.path.append(base_path+'python')
 
 from fileList import nfiles, allFiles
-from fluxCalculation import psi_f
+from utils import psi_f
 
 #######################
 # get and define parameters
@@ -52,24 +54,24 @@ outfile = outfile_path+'/PDF_'+Datatype+'_ScrambleFullSky_LEBDT'+str(LECut)+'_HE
 outfile_quad = outfile_path+'/PDF_'+Datatype+'_ScrambleFullSky_LEBDT'+str(LECut)+'_HEBDT'+str(HECut)+'_2D'+'_quad.pkl'
 
 if os.path.isfile(outfile):
-    print ' ... already exists'
+    print (' ... already exists')
     sys.exit(1)
 
 livetime = {}
 livetime['Burnsample'] = 1116125.821572
 livetime['Data'] = 28272940. + 30674072. + 31511810.5 + 31150852. + 30059465.  
 
-#############
+######## Arrays for all years ######
 energy_reco = np.array([])
 psi_reco = np.array([])
 weight = np.array([])
 
 for year in allFiles[Datatype].keys():
-    print '  year',year
+    print ('  year %s' %year)
 
-    fileData = np.load(allFiles[Datatype][year]).item()
+    fileData = np.load(allFiles[Datatype][year], allow_pickle=True, encoding='latin1').item()
 
-    print '   ', len(fileData['all']['energy_rec']), 'events in sample'
+    print (' %i events in sample' %len(fileData['all']['energy_rec']))
     
     BDTScore_LE = np.array(fileData['all']['BDTScore_bb100'])
     BDTScore_HE = np.array(fileData['all']['BDTScore_ww300'])
@@ -79,21 +81,18 @@ for year in allFiles[Datatype].keys():
     tmp_psi_reco = np.array(fileData['all']['psi_rec'])[BDTmask]
     tmp_zenith_reco = np.array(fileData['all']['zenith_rec'])[BDTmask]
     tmp_azimuth_reco = np.array(fileData['all']['azimuth_rec'])[BDTmask]       
-    tmp_ra_reco = np.array(fileData['all']['ra_rec'])[BDTmask]
+    tmp_ra_reco = np.array(fileData['all']['RA_rec'])[BDTmask]
     tmp_dec_reco = np.array(fileData['all']['dec_rec'])[BDTmask]       
 
-    print '   ', len(tmp_energy_reco), 'events pass BDT cut'
+    print ('  %i events passed BDT cut' %len(tmp_energy_reco))
 
-    print (tmp_dec_reco, tmp_zenith_reco - np.pi/2.)
-    
-    
     RA_GC = 266./180.*np.pi
     dec_GC = -29.*np.pi/180
 
-    argument = (np.cos(tmp_psi_reco) - np.cos(np.pi/2.-dec_GC)*np.cos(np.pi/2.-tmp_dec_reco))/\
-        (np.sin(np.pi/2.-dec_GC)*np.sin(np.pi/2.-tmp_dec_reco))
+ #    argument = (np.cos(tmp_psi_reco) - np.cos(np.pi/2.-dec_GC)*np.cos(np.pi/2.-tmp_dec_reco))/\
+ #       (np.sin(np.pi/2.-dec_GC)*np.sin(np.pi/2.-tmp_dec_reco))
 
-    print (tmp_delta_RA, np.arccos( argument ))
+#    print (tmp_delta_RA, np.arccos( argument ))
     
     #keep_argument_boundary =  np.where(argument<-1.)
     #keep_large_DeltaRA = np.where(tmp_delta_RA>np.pi/2.)
@@ -126,4 +125,4 @@ pickle.dump(hist_pdf_signal, savefile)
 
 #savefile_quad = open(outfile_quad,'wx')
 #pickle.dump(hist_pdf_signal_quad, savefile_quad)
-print ' ... done'
+print (' ... done')
