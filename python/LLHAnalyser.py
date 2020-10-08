@@ -12,6 +12,7 @@ class Profile_Analyser:
         self.signalPDF = None
         self.backgroundPDF = None
 
+
         self.signalPDF_uncert2 = None
         self.backgroundPDF_uncert2 = None
 
@@ -47,13 +48,14 @@ class Profile_Analyser:
         self.moreOutput = True
 
 
-    def loadBackgroundPDF(self,pdf):
+    def loadBackgroundPDF(self,pdf, verbose = False):
         if self.livetime < 0:
             raise ValueError('Livetime of the analysis is not defined yet. Please do this first!')
             
         self.backgroundPDF = pdf.flatten()*self.livetime
         self.nBackgroundEvents = np.sum(self.backgroundPDF)
-        print('total background events:', self.nBackgroundEvents)
+        if verbose:
+            print('total background events:', self.nBackgroundEvents)
         
         self.nbins = len(pdf)
 
@@ -313,6 +315,11 @@ class Profile_Analyser_Normalised:
         self.ready = False
         self.signalPDF = None
         self.backgroundPDF = None
+        
+        #This is our assumed baseline background PDF
+        #This is only filled once, and does not get updated when generating trials
+        self.baseline_backgroundPDF = None 
+        self.baseline_init = False
 
         self.signalPDF_uncert2 = None
         self.backgroundPDF_uncert2 = None
@@ -347,11 +354,16 @@ class Profile_Analyser_Normalised:
     def allowNegativeSignal(self):
         self.AllowNegativeSignal = True        
 
-    def loadBackgroundPDF(self,pdf):
+    def loadBackgroundPDF(self,pdf, verbose = False):
         self.backgroundPDF = pdf.flatten()/np.sum(pdf)
         self.nTotalEvents = np.sum(pdf)
-        print('Total number of expected background events:', self.nTotalEvents)
-        
+        if verbose:
+            print('Total number of expected background events:', self.nTotalEvents)
+        if not self.baseline_init:
+            print("Initalizing the baseline pdf")
+            self.baseline_backgroundPDF = self.backgroundPDF
+            self.baseline_init = True
+            
         self.nbins = len(pdf.flatten())
 
     def loadSignalPDF(self,pdf):
@@ -372,12 +384,15 @@ class Profile_Analyser_Normalised:
             raise ValueError('Shape of signal uncertainty pdf does not match the background pdf!')
             
 
-    def loadSignalContaminationPDF(self,pdf):
-        self.signalContaminationPDF = pdf.flatten()/self.nSignalEvents
+    def loadSignalScrambledPDF(self,pdf):
+        #self.signalContaminationPDF = pdf.flatten()/self.nSignalEvents
+        #This is a pdf so we should normalize it as such
+        self.signalContaminationPDF = pdf.flatten()/np.sum(pdf)
         if self.nbins != len(pdf.flatten()):
             raise ValueError('Shape of signal contamination pdf does not match the background pdf!')
     
-    def loadSignalContaminationUncertaintyPDF(self,pdf):
+    def loadSignalScrambledUncertaintyPDF(self,pdf):
+        #TO be check.
         self.signalContaminationPDF_uncert2 = pdf.flatten()/self.nSignalEvents
         if self.nbins != len(pdf.flatten()):
             raise ValueError('Shape of signal contamination uncertainty pdf does not match the background pdf!')
@@ -386,14 +401,21 @@ class Profile_Analyser_Normalised:
 
         if not self.ready:
             raise ValueError('Not all pdfs are correctly loaded!')
-
-        observationPDF = self.nTotalEvents* ((1-xi)*self.backgroundPDF + xi*self.signalPDF)
+        #We use always the baseline PDF, this does not get updated
+        observationPDF = self.nTotalEvents* ((1-xi)*self.baseline_backgroundPDF + xi*self.signalPDF)
 
         self.observation=np.zeros(np.shape(self.backgroundPDF))
         for i in range(len(self.observation)):
             self.observation[i]=np.random.poisson(observationPDF[i])
         
         self.computedBestFit = False
+        
+        #So once we have a new dataset, our background estimate has to change! as the scrambled background is taken from data
+        #if (self.LLHtype == 'PoissonWithSignalSubtraction' or self.LLHtype == 'EffectiveWithSignalSubtraction'):
+        #So this is a trick, in reality we don't use the exact pseudosample, that will require to get individual events and re-scrambled their RA. Instead we are going to construct a PDF using the scrambled signal.
+        scrambledPDF = self.nTotalEvents* ((1-xi)*self.baseline_backgroundPDF + xi*self.signalContaminationPDF)
+        self.loadBackgroundPDF(scrambledPDF)
+        
         
     def evaluateLLH(self, xi):
         
@@ -494,8 +516,15 @@ class Profile_Analyser_Normalised:
         
         if self.bestFit['xi'] > 0.:
             self.TS = 2*(self.bestFit['LLH_ref']-self.bestFit['LLH'])
+            
+        #This means that somehow the minimizer didn't reach the best value (which should be xi = 0)
+        if self.TS < 0:
+            self.TS = 0
+        #    self.bestFit['xi'] = 0
+    
+   # def CalculateFrequentisLimit(self, TS, conf_level): 
         
-
+        
     def CalculateUpperLimit(self,conf_level):
 
         nIterations = 0
@@ -544,6 +573,7 @@ class Profile_Analyser_Normalised:
 
                 param_low=param_mean
                 delta_param=(param_up-param_low)/(param_up)
+                   
                 
                 if((dTS>deltaTS-eps_TS) and (delta_param < eps_param)):
                     cc = 0
@@ -557,6 +587,56 @@ class Profile_Analyser_Normalised:
                     
         return param_up
        
+        
+        
+    def DoScan(self, ni_min, ni_max, nstep, ts, nTrials, conf_level):
+        print(" Scanning injected fraction of events range [%.6f, %.6f]" % (ni_min, ni_max))
+        results = []
+        step = 0
+        frac = 0.
+        tolerance = 0.1
+        ni_mean = 0
+        while (np.abs(frac*100 - conf_level) > tolerance):
+            ni_mean = (ni_max + ni_min)/2
+          
+            TS = []
+            for i in range(nTrials):
+                self.sampleObservation(ni_mean)
+                self.ComputeTestStatistics()
+                TS.append(self.TS)
+
+            TS = np.array(TS)
+            n = TS[np.where(TS > ts)].size
+            ntot = TS.size
+            frac = n/ntot
+            #frac_error = BinomialError(ntot, n)/ntot
+
+            print(" [%2d] ni %5.6f, n %4d, ntot %4d, C.L %.2f +/- %.2f" %
+                (step, ni_mean, n, ntot, frac, 0))
+
+            if(frac * 100 < conf_level):
+                ni_min = ni_mean
+            else:
+                ni_max = ni_mean
+           
+            results.append([ni_mean, n, ntot])
+            
+        
+
+        return ni_mean, results    
+
+    def CalculateNeymanSensitivity(self, nTrials, conf_level):
+        #Let's first guess using the likelihood intervales
+        sens = self.CalculateSensitivity(nTrials, conf_level)
+        median_ts = np.percentile(sens['TS_dist'], 50)
+        first_guess = sens['median']
+        p = conf_level/100
+        factor = 1.
+        ni_min = first_guess / factor * (1 - p)
+        ni_max = first_guess * factor / p
+        
+        return self.DoScan(ni_min, ni_max, 50, median_ts, nTrials, conf_level)
+        
     
     def CalculateSensitivity(self,nTrials, conf_level, doNeyman=False, nTrialsNeyman=100):
 
