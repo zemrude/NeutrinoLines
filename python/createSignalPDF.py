@@ -12,7 +12,6 @@ import math
 from icecube import astro
 import pickle
 from optparse import OptionParser
-import env
 
 from termcolor import colored, cprint
 
@@ -25,6 +24,13 @@ halo_found = halo_spec is not None
 if halo_found:
     from halo import Halo
 
+# This is needed to load the environmental variable
+import os, subprocess as sp, json
+source = 'source /data/ana/BSM/HT_Cascade/FinalAnalysisCode/env.sh'
+dump = '/usr/bin/python -c "import os, json;print json.dumps(dict(os.environ))"'
+pipe = sp.Popen(['/bin/bash', '-c', '%s && %s' %(source,dump)], stdout=sp.PIPE)
+env = json.loads(pipe.stdout.read())
+os.environ = env
     
 base_path = os.environ['ANALYSIS_BASE_PATH']
 sys.path.append(base_path+'python')
@@ -39,8 +45,10 @@ from fileList import nfiles, allFiles
 from IceCube_sim import genie_correction_factor
 
 #This takes some time due to the Jfactors
-cprint ("Loading the Jfactors... this takes a little while", "green")
+print ("Loading the Jfactors... this takes a little while")
 from fluxCalculation import phiDM_ann, phiDM_dec
+cprint ("Done!", "green")
+
 
 ##################
 def oversample(tmp_weight, tmp_nu_type,
@@ -90,35 +98,6 @@ def oversample(tmp_weight, tmp_nu_type,
 
 ########################
 
-usage = "usage: %prog [options]"
-parser = OptionParser(usage)
-parser.add_option("-t", "--type",default="annihilation",
-                  dest="TYPE", help="annihilation/ decay")
-parser.add_option("-c", "--channel",default="nue",
-                  dest="CHANNEL", help="Annihilation channel")
-parser.add_option("-p", "--profile",default="NFW",
-                  dest="PROFILE", help="DM Profile")
-parser.add_option("-a", "--lecut", default='0.15',
-                  dest="LECUT", help="Cut on LE BDT")
-parser.add_option("-b", "--hecut", default='0.2',
-                  dest="HECUT", help="Cut on HE BDT")
-parser.add_option("-m", "--mass", default='1000',
-                  dest="MASS", help="DM mass")
-parser.add_option("-o", "--oversampling", default='100',
-                  dest="OVERSAMPLING", help="Oversampling factor")
-(options,args) = parser.parse_args()
-        
-mode = options.TYPE
-channel = options.CHANNEL
-profile = options.PROFILE
-
-LECut = float(options.LECUT)
-HECut = float(options.HECUT)
-
-mass = int(options.MASS)
-nOversampling = int(options.OVERSAMPLING)
-           
-bins_vars={'energy_rec':np.logspace(1,5,48+1),'psi_rec':np.linspace(0.,np.pi,90+1)}
 
 usage = "usage: %prog [options]"
 parser = OptionParser(usage)
