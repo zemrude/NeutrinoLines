@@ -17,7 +17,7 @@ for sys in systematics:
     for channel in DM_channel:
         for profile in DM_profiles:
             for mode in DM_mode:
-                for llh in likelhood:
+                for llh in likelihood:
                     for mass in LEmasses:
                         if channel == 'nue':
                             oversampling = 100
