@@ -14,13 +14,27 @@ import pickle
 from optparse import OptionParser
 import env
 
+import importlib
+halo_spec = importlib.util.find_spec("halo")
+halo_found = halo_spec is not None
+
+if halo_found:
+    from halo import Halo
+
+    
 base_path = os.environ['ANALYSIS_BASE_PATH']
 sys.path.append(base_path+'python')
 from utils import psi_f
 
+
+print ("loading flux...")
 from fileList import nfiles, allFiles
 from IceCube_sim import genie_correction_factor
+
+print ("this takes alot of time")
+
 from fluxCalculation import phiDM_ann, phiDM_dec
+print ("flux loaded")
 
 #######################
 # get and define parameters
@@ -65,8 +79,9 @@ filename_template = '/PDF_DM_FullSkyScrambled_'+mode+'_'+profile+'profile_LEBDT'
 outfile = outfile_path+filename_template+'.pkl'
 outfile_quad = outfile_path+filename_template+'_quad.pkl'
 
-print ("Start %.3f GeV %s to %s, %s profile, BDTCuts: (%.2f, %.2f) oversampling: %i"%(mass, mode, channel, profile, LECut, HECut, nOversampling)
+print ("Start) %.1f GeV %s to %s, %s profile, BDTCuts: (%.2f, %.2f) oversampling: %i"%(mass, mode, channel, profile, LECut, HECut, nOversampling))
 
+print ("outfile : %s"%outfile)
 #print 'start', mass,'GeV',mode,'to',channel, profile, 'profile','  BDTCuts:', LECut,HECut,' oversampling:',nOversampling  
 if os.path.isfile(outfile):
     print (' ... file already exists')
@@ -147,11 +162,19 @@ signal_energy_reco = np.array([])
 signal_psi_reco = np.array([])
 signal_weight = np.array([])
 
+if halo_found:
+    spinner = Halo(spinner='dots')
+
                       
 for fileType in allFiles['MC'][systematics].keys():
-    print ('   opening file %s'%allFiles['MC'][systematics][fileType])
     
-    fileData = np.load(allFiles['MC'][systematics][fileType]).item()
+    text = "  Opening file %s"%allFiles['MC'][systematics][fileType].split('/')[-1]
+    if halo_found:
+        spinner.start(text)
+    else:
+        print(text)
+        
+    fileData = np.load(allFiles['MC'][systematics][fileType], allow_pickle=True, encoding='latin1').item()
 
     tmp_weight = np.array(fileData['all weight'])[:,0]
     tmp_nu_type = np.array(fileData['all weight'])[:,1]
@@ -188,12 +211,23 @@ for fileType in allFiles['MC'][systematics].keys():
     if len(tmp_weight[tmp_weight>0.]) == 0:
         print ('   nothing more to do')
         continue
-        
-    print ('      start oversampling of %i events with factor %i' %(len(tmp_weight[tmp_weight>0.]), nOversampling))
+    
+    text = " start oversampling: %i events with factor %i" %(len(tmp_weight[tmp_weight>0.]), nOversampling)
+
+    if halo_found:
+        spinner.succeed(" Loaded")
+        spinner.start(text)
+    else:
+        print (text)
     
     oversampled_weight, oversampled_nu_type, oversampled_energy_reco, oversampled_energy_true, oversampled_RA_reco, oversampled_RA_true, oversampled_dec_reco, oversampled_dec_true = oversample(tmp_weight[tmp_weight>0.], tmp_nu_type[tmp_weight>0.], tmp_energy_reco[tmp_weight>0.], tmp_energy_true[tmp_weight>0.], tmp_zenith_reco[tmp_weight>0.], tmp_zenith_true[tmp_weight>0.], tmp_azimuth_reco[tmp_weight>0.], tmp_azimuth_true[tmp_weight>0.], nOversampling)
                            
-    print ('      resulting in %i events'%len(oversampled_weight))
+    if halo_found:
+        spinner.succeed(text)
+        
+    else:
+        print(text)
+
         
     RA_GC = 266./180.*np.pi
                                                       
@@ -233,7 +267,9 @@ for fileType in allFiles['MC'][systematics].keys():
     signal_energy_reco = np.append(signal_energy_reco, new_energy_reco)
     signal_psi_reco = np.append(signal_psi_reco,new_psi_reco)
     signal_weight = np.append(signal_weight,new_weight)     
-                           
+    
+    if halo_found:
+        spinner.succeed(" Finished file")
         
 hist_pdf_signal = np.histogram2d(signal_energy_reco,signal_psi_reco,
                                  bins=(bins_vars['energy_rec'], bins_vars['psi_rec']),weights = signal_weight)

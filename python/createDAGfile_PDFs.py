@@ -22,7 +22,7 @@ for sys in systematics:
                     else:
                         oversampling = -1
                         
-                    jobid = "%.2i-%s-%s-%s-%s-LE"%(counter,str(channel), str(mass), str(profile), str(mode))  
+                    jobid = "%.2i-unbin-%s-%s-%s-%s-LE"%(counter,str(channel), str(mass), str(profile), str(mode))  
                     print("JOB " + jobid + " PDF_SIGNAL.submit")
                     print("VARS " + jobid + " JOBNAME=\"%s\" TYPE=\"%s\" CHANNEL=\"%s\" PROFILE=\"%s\" SYST=\"%s\" LECUT=\"0.15\" HECUT=\"0.2\" MASS=\"%i\" OVERSAMPLING=\"%i\""%(jobid, mode, channel, profile,sys, mass, oversampling))
                     
@@ -32,7 +32,7 @@ for sys in systematics:
                     else:
                         oversampling = -1
                         
-                    jobid = "%.2i-%s-%s-%s-%s-HE"%(counter,str(channel), str(mass), str(profile), str(mode))  
+                    jobid = "%.2i-unbin-%s-%s-%s-%s-HE"%(counter,str(channel), str(mass), str(profile), str(mode))  
                     print("JOB " + jobid + " PDF_SIGNAL.submit")
                     print("VARS " + jobid + " JOBNAME=\"%s\" TYPE=\"%s\" CHANNEL=\"%s\" PROFILE=\"%s\" SYST=\"%s\" LECUT=\"-1.0\" HECUT=\"0.3\" MASS=\"%i\" OVERSAMPLING=\"%i\""%(jobid, mode, channel, profile,sys, mass, oversampling))
     counter += counter

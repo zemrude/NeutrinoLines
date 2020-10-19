@@ -166,6 +166,74 @@ if options.TYPE == 'background':
 
 	fig.savefig('plots/PDF_Astro.png')
 	fig.savefig('plots/PDF_Astro.pdf')
+    
+    
+    ############################################
+
+	h1 = pickle.load(open(base_path+'PDFs/corsika_KDE/corsika_KDE/nominal/PDF_nominal_background_corsika_KDE_'+BDTstring+'_2D.pkl','r'))
+
+	fig,(ax1,ax2,ax3) = plt.subplots(1,3,figsize=(30,8))
+	plt.rcParams.update({'figure.titlesize': 32})
+	plt.suptitle('New Corsika: oversample + KDE')
+
+	pcm = ax1.pcolormesh(merge_bins(h1,2,5)[2],merge_bins(h1,2,5)[1],merge_bins(h1,2,5)[0],norm=colors.LogNorm(vmin=1e-12, vmax=1e-6),cmap='Oranges')
+	fig.colorbar(pcm, ax=ax1, label='rate (Hz)')
+	ax1.set_xlabel(r"$\Psi_{\mathrm{reco}}$ (rad)")
+	ax1.set_ylabel(r"E$_{\mathrm{reco}}$ (GeV)")
+	ax1.set_yscale('log')
+
+	ax2.step(np.array(merge_bins(h1,2,90)[1][:-1]).flatten(),merge_bins(h1,2,90)[0].flatten(),where='post', lw=3, color = 'k')
+	ax2.set_xlabel(r"E$_{\mathrm{reco}}$ (GeV)")
+	ax2.set_ylabel(r"rate (Hz)")
+	ax2.set_xscale('log')
+	ax2.set_yscale('log')
+	ax2.set_ylim(1e-8,1e-4)
+
+	ax3.step(np.array(merge_bins(h1,48,5)[2][:-1]).flatten(),merge_bins(h1,48,5)[0].flatten(),where='post', lw=3, color = 'k')
+	ax3.set_xlabel(r"$\Psi_{\mathrm{reco}}$ (rad)")
+	ax3.set_ylabel(r"rate (Hz)")
+	ax3.set_yscale('log')
+	ax3.set_ylim(1e-8,1e-4)
+
+	fig.subplots_adjust(wspace=0.3)
+
+	fig.savefig('plots/PDF_Corsika_KDE.png')
+	fig.savefig('plots/PDF_Corsika_KDE.pdf')
+    
+    
+    
+    ############################################
+
+	h1 = pickle.load(open(base_path+'PDFs/corsika_KDE/corsika/nominal/PDF_nominal_background_corsika_'+BDTstring+'_2D.pkl','r'))
+
+	fig,(ax1,ax2,ax3) = plt.subplots(1,3,figsize=(30,8))
+	plt.rcParams.update({'figure.titlesize': 32})
+	plt.suptitle('New Corsika: oversample')
+
+	pcm = ax1.pcolormesh(merge_bins(h1,2,5)[2],merge_bins(h1,2,5)[1],merge_bins(h1,2,5)[0],norm=colors.LogNorm(vmin=1e-12, vmax=1e-6),cmap='Oranges')
+	fig.colorbar(pcm, ax=ax1, label='rate (Hz)')
+	ax1.set_xlabel(r"$\Psi_{\mathrm{reco}}$ (rad)")
+	ax1.set_ylabel(r"E$_{\mathrm{reco}}$ (GeV)")
+	ax1.set_yscale('log')
+
+	ax2.step(np.array(merge_bins(h1,2,90)[1][:-1]).flatten(),merge_bins(h1,2,90)[0].flatten(),where='post', lw=3, color = 'k')
+	ax2.set_xlabel(r"E$_{\mathrm{reco}}$ (GeV)")
+	ax2.set_ylabel(r"rate (Hz)")
+	ax2.set_xscale('log')
+	ax2.set_yscale('log')
+	ax2.set_ylim(1e-8,1e-4)
+
+	ax3.step(np.array(merge_bins(h1,48,5)[2][:-1]).flatten(),merge_bins(h1,48,5)[0].flatten(),where='post', lw=3, color = 'k')
+	ax3.set_xlabel(r"$\Psi_{\mathrm{reco}}$ (rad)")
+	ax3.set_ylabel(r"rate (Hz)")
+	ax3.set_yscale('log')
+	ax3.set_ylim(1e-8,1e-4)
+
+	fig.subplots_adjust(wspace=0.3)
+
+	fig.savefig('plots/PDF_Corsika_Oversampling.png')
+	fig.savefig('plots/PDF_Corsika_Oversampling.pdf')    
+    
 
 ############################################
 #case 2: signal

@@ -1,7 +1,10 @@
 import os
 
-data_path = os.environ['ANALYSIS_DATA_DIR']
-
+try:
+    data_path = os.environ['ANALYSIS_DATA_DIR']
+except Exception as e:
+    raise Exception("No enviromental variables loaded, try doing `import env` before")
+    
 allFiles = {}
 
 allFiles['MC'] = {}
@@ -139,12 +142,21 @@ allFiles['Burnsample']['2014'] = data_path+'L4_IC86.2014_data_8_Runs_merged_LE_o
 allFiles['Burnsample']['2015'] = data_path+'L4_IC86.2015_data_8_Runs_merged_LE_or_HE.npy'
 allFiles['Burnsample']['2016'] = data_path+'L4_IC86.2016_data_7_Runs_merged_LE_or_HE.npy'
 
+"""
 allFiles['Data'] = {}
 allFiles['Data']['2012'] = data_path+'L4_IC86.2012_data_merged_LE_or_HE.npy'
 allFiles['Data']['2013'] = data_path+'L4_IC86.2013_data_merged_LE_or_HE.npy'
 allFiles['Data']['2014'] = data_path+'L4_IC86.2014_data_merged_LE_or_HE.npy'
 allFiles['Data']['2015'] = data_path+'L4_IC86.2015_data_merged_LE_or_HE.npy'
 allFiles['Data']['2016'] = data_path+'L4_IC86.2016_data_merged_LE_or_HE.npy'
+"""
+
+allFiles['Data'] = {}
+allFiles['Data']['2012'] = data_path+'L4_IC86.2012_reprocessed_data_merged_LE_or_HE.npy'
+allFiles['Data']['2013'] = data_path+'L4_IC86.2013_reprocessed_data_merged_LE_or_HE.npy'
+allFiles['Data']['2014'] = data_path+'L4_IC86.2014_reprocessed_data_merged_LE_or_HE.npy'
+allFiles['Data']['2015'] = data_path+'L4_IC86.2015_reprocessed_data_merged_LE_or_HE.npy'
+allFiles['Data']['2016'] = data_path+'L4_IC86.2016_reprocessed_data_merged_LE_or_HE.npy'
 
 
 ### nfiles normalization for MC datasets

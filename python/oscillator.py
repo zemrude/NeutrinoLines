@@ -1,4 +1,5 @@
-mport nuflux
+try:
+    import nuflux
 except Exception as e :
     raise Exception("The required `nuflux` project is missing (https://github.com/IceCubeOpenSource/nuflux/tree/master/docs)")
 

@@ -172,7 +172,6 @@ for Datatype in ['Burnsample','Data']:
                 
         tmp_weight[tmp_BDTScore_LE<LECut] = 0.
         tmp_weight[tmp_BDTScore_HE<HECut] = 0. 
-        tmp_weight[tmp_psi_reco<np.pi/2.] = 0.
 
         print '   ', len(tmp_weight[tmp_weight>0.]), 'events pass cuts'
                               

@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.special as sps
 from iminuit import Minuit
+from utils import ConfidenceIntervalError
 
 from sensitivity_utils import BinomialError, inv_BinomialError
 
@@ -54,12 +55,20 @@ class Profile_Analyser:
     def loadBackgroundPDF(self,pdf, verbose = False):
         if self.livetime < 0:
             raise ValueError('Livetime of the analysis is not defined yet. Please do this first!')
+      
+        if removeEmptyBins:
+            print("We are removing empty bins")
+            
             
         self.backgroundPDF = pdf.flatten()*self.livetime
         self.nBackgroundEvents = np.sum(self.backgroundPDF)
         if verbose:
             print('total background events:', self.nBackgroundEvents)
-        
+
+            
+            
+            
+            
         self.nbins = len(pdf)
 
     def loadSignalPDF(self,pdf):
@@ -260,7 +269,7 @@ class Profile_Analyser:
         return param_up
        
     
-    def CalculateSensitivity(self,nTrials, conf_level):
+    def CalculateSensitivity(self, nTrials, conf_level):
 
         if self.LLHtype == None:
             raise ValueError('LLH type not defined yet!')
@@ -343,6 +352,8 @@ class Profile_Analyser_Normalised:
         
         self.moreOutput = False
         self.AllowNegativeSignal = False
+        self.no_empty_bins = False
+        
 
     def setLLHtype(self,type):
         availableTypes = ['Poisson', 'Effective', 'PoissonWithSignalSubtraction', 'EffectiveWithSignalSubtraction']
@@ -354,19 +365,33 @@ class Profile_Analyser_Normalised:
     def saveMoreOutput(self):
         self.moreOutput = True
 
+    def setEmptyBins(self):
+        self.no_empty_bins = True
+
     def allowNegativeSignal(self):
         self.AllowNegativeSignal = True 
         print(" Allowing for negative signal") 
 
     def loadBackgroundPDF(self,pdf, verbose = False):
-        self.backgroundPDF = pdf.flatten()/np.sum(pdf)
+        self.backgroundPDF = pdf.flatten()    
         self.nTotalEvents = np.sum(pdf)
+#        self.backgroundPDF = pdf.flatten()/np.sum(pdf)
+
         if verbose:
             print('Total number of expected background events:', self.nTotalEvents)
         if not self.baseline_init:
             print("Initalizing the baseline pdf")
-            self.baseline_backgroundPDF = self.backgroundPDF
+            self.baseline_backgroundPDF = self.backgroundPDF/self.nTotalEvents
             self.baseline_init = True
+            
+
+        if self.no_empty_bins:
+            mask = (self.backgroundPDF == 0)
+            self.backgroundPDF[mask] = ConfidenceIntervalError(self.backgroundPDF[mask])
+        
+        #Normalizing
+        self.backgroundPDF = self.backgroundPDF/np.sum(self.backgroundPDF)
+
             
         self.nbins = len(pdf.flatten())
 
@@ -391,8 +416,8 @@ class Profile_Analyser_Normalised:
 
     def loadSignalScrambledPDF(self,pdf):
         #We assume that the scrambled PDF has the same number of events as 
-        if (np.sum(pdf) != self.nSignalEvents):
-            raise ValueError(' Normalization of scrambled signal does not match the signal pdf!')
+        #if (np.sum(pdf) != self.nSignalEvents):
+        #    raise ValueError(' Normalization of scrambled signal does not match the signal pdf!')
         self.signalContaminationPDF = pdf.flatten()/self.nSignalEvents
         #This is a pdf so we should normalize it as such
         #self.signalContaminationPDF = pdf.flatten()/np.sum(pdf)
@@ -415,7 +440,10 @@ class Profile_Analyser_Normalised:
 
         self.observation=np.zeros(np.shape(self.backgroundPDF))
         for i in range(len(self.observation)):
-            self.observation[i]=np.random.poisson(observationPDF[i])
+            if observationPDF[i] == 0:
+                self.observation[i]=np.random.poisson(1.02) # Poisson mean with 90% below 2.3
+            else:
+                self.observation[i]=np.random.poisson(observationPDF[i])
         
         self.computedBestFit = False
         
@@ -691,7 +719,7 @@ class Profile_Analyser_Normalised:
         return self.DoScan(ni_min, ni_max, 50, median_ts,  conf_level, precision)
         
     
-    def CalculateSensitivity(self,nTrials, conf_level, doNeyman=False, nTrialsNeyman=100):
+    def CalculateSensitivity(self, nTrials, conf_level):
 
         if self.LLHtype == None:
             raise ValueError('LLH type not defined yet!')
@@ -733,46 +761,7 @@ class Profile_Analyser_Normalised:
             dic_brazilian['upperlimits'] = upperlimits
             dic_brazilian['bestFits'] = fits
             
-            
-        if doNeyman:
-            print(' Adding Neyman sensitivity now')
-            first_guess = p_median
                         
-            median_TS = np.median(TS)
-            if median_TS<0.:
-                median_TS = 0.
-                
-            xi_scan_min = first_guess / 2. * (1 - (conf_level/100.))
-            xi_scan_max = first_guess * 2. / (conf_level/100.)
-                               
-            nIterations = 0
-            eps_CL = 0.01
-            delta_CL = 1.
-            while delta_CL>eps_CL:
-                nIterations += 1
-                xi_scan_mean=(xi_scan_min+xi_scan_max)/2.
-                
-                tmp_TS = []
-                for i in range(nTrialsNeyman):
-                    self.sampleObservation(xi_scan_mean)
-                    self.ComputeTestStatistics()
-                    tmp_TS.append(self.TS)
-                tmp_TS = np.array(tmp_TS)
-
-                n_aboveThreshold = tmp_TS[np.where(tmp_TS > median_TS)].size
-                n_tot = tmp_TS.size
-                fraction_aboveThreshold = float(n_aboveThreshold)/float(n_tot)
-                #frac_aboveThreshold_error = BinomialError(n_tot, n_aboveThreshold)/n_tot
-                
-                delta_CL = np.abs(conf_level/100.-fraction_aboveThreshold)
-                
-                if(fraction_aboveThreshold<conf_level/100.):
-                    xi_scan_min=xi_scan_mean
-                else:
-                    xi_scan_max=xi_scan_mean
-                                
-            dic_brazilian['Neyman_sensitivity'] = xi_scan_mean
-            
         return dic_brazilian   
     
     

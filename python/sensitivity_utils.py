@@ -6,6 +6,26 @@ import scipy.stats
 import scipy.special
 import scipy.optimize
 
+def inv_BinomialError(error, conf_level):
+    r"""Estimates the number of trials for a given precision and a confidence_level
+    
+    Paramters
+    ---------
+    error : float
+        Desired number of precision in %, error in n/ntot * 100
+    conf_level : float
+        The confidence level in %, n/ntot * 100
+    
+    Returns
+    -------
+    ntot : int
+        number of trials
+    """
+    p = conf_level / 100
+    error = error / 100
+    
+    return int(np.round((1 - p) / error**2))
+
 def BinomialError(ntot, n):
     r"""Computes binomial error (sqrt of variance) for measuring
     n out of ntot trials above a given threshold.

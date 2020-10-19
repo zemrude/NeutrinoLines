@@ -247,7 +247,9 @@ for j in range(nMC):
         TS = 0.
         if bestFit['nsig'] > 0.:
             TS = 2*(LLH(LLHmin_ref.fitarg['n1'],LLHmin_ref.fitarg['n2'],LLHmin_ref.fitarg['n3'],LLHmin_ref.fitarg['nsig'])-bestFit['LLH'])
-        
+            
+            
+        # upper limit calulation
         nIterations =0
         eps_TS=0.005
         eps_param=0.05

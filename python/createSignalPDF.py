@@ -23,8 +23,15 @@ halo_found = halo_spec is not None
 
 if halo_found:
     from halo import Halo
+    
+tqdm_spec = importlib.util.find_spec("tqdm")
+tqdm_found = tqdm_spec is not None
+
+if tqdm_found:
+    import tqdm as tq
 
 # This is needed to load the environmental variable
+
 import os, subprocess as sp, json
 source = 'source /data/ana/BSM/HT_Cascade/FinalAnalysisCode/env.sh'
 dump = '/usr/bin/python -c "import os, json;print json.dumps(dict(os.environ))"'
@@ -39,24 +46,26 @@ from utils import psi_f, bcolors
 r"""
     This script generates the signal PDFs both for the true signal and it's scrambled version as well as the uncertainties**2
 
+    Returns:
+    --------
+    2 fine binned numpy histograms 2d with signal PDF and scrambled signal PDF
+    2 course binned phyist histogram with quantile binning (same statistical significance per bin)
+    with signal PDF and scrambled signal PDF
+    
 """
 
 from fileList import nfiles, allFiles
 from IceCube_sim import genie_correction_factor
 
-#This takes some time due to the Jfactors
-print ("Loading the Jfactors... this takes a little while")
-from fluxCalculation import phiDM_ann, phiDM_dec
-cprint ("Done!", "green")
 
-
-##################
 def oversample(tmp_weight, tmp_nu_type,
                tmp_energy_reco, tmp_energy_true,
                tmp_zenith_reco, tmp_zenith_true,
                tmp_azimuth_reco, tmp_azimuth_true,
                nOversampling):
 
+   
+    
     r"""
     Function to do the oversampling. For each event it's repeated nsampling times with different times (ie RA)
     
@@ -79,15 +88,24 @@ def oversample(tmp_weight, tmp_nu_type,
     oversampled_RA_true = np.zeros((nOversampling,len(tmp_weight)))
     oversampled_dec_true = np.zeros((nOversampling,len(tmp_weight)))
 
+    if tqdm_found and host =='local':
+        pbar = tq.tqdm(total =  nOversampling)
+        
     for i in range(nOversampling):
         #Generate a random time in MJD
         eventTime = stime + random.random() * (etime - stime)
         eventTime = apTime(eventTime, format='unix').mjd
         
+        if tqdm_found and host =='local':
+            pbar.update(1)
+        
         #recalculate RA, dec based on reconstructed zenith,azimuth and new time
         oversampled_RA_reco[i], oversampled_dec_reco[i] = astro.dir_to_equa(tmp_zenith_reco,tmp_azimuth_reco,eventTime)
         oversampled_RA_true[i], oversampled_dec_true[i] = astro.dir_to_equa(tmp_zenith_true,tmp_azimuth_true,eventTime)
 
+    if tqdm_found and host =='local':
+        pbar.close()
+        
     # These variables remain the same, so we append nOversampling values
     oversampled_weight = np.tile(tmp_weight/nOversampling,nOversampling)
     oversampled_nu_type = np.tile(tmp_nu_type,nOversampling)
@@ -96,30 +114,40 @@ def oversample(tmp_weight, tmp_nu_type,
         
     return oversampled_weight, oversampled_nu_type, oversampled_energy_reco, oversampled_energy_true, oversampled_RA_reco.flatten(), oversampled_RA_true.flatten(), oversampled_dec_reco.flatten(), oversampled_dec_true.flatten()
 
-########################
+#------------------------
 
 
 usage = "usage: %prog [options]"
 parser = OptionParser(usage)
 parser.add_option("-t", "--type",default="annihilation",
-                  dest="TYPE", help="annihilation/ decay")
+                  dest="TYPE", help="annihilation/ decay, default is annihilation")
 parser.add_option("-c", "--channel",default="nue",
-                  dest="CHANNEL", help="Annihilation channel")
+                  dest="CHANNEL", help="Annihilation channel, default is nue")
 parser.add_option("-p", "--profile",default="NFW",
-                  dest="PROFILE", help="DM Profile")
-parser.add_option("-a", "--lecut", default='0.15',
-                  dest="LECUT", help="Cut on LE BDT")
-parser.add_option("-b", "--hecut", default='0.2',
-                  dest="HECUT", help="Cut on HE BDT")
+                  dest="PROFILE", help="DM Profile, default is NFW")
+parser.add_option("-a", "--lecut", default='-1',
+                  dest="LECUT", help="Cut on LE BDT, default is for the HE sample")
+parser.add_option("-b", "--hecut", default='0.3',
+                  dest="HECUT", help="Cut on HE BDT, default is for the HE sample")
 parser.add_option("-m", "--mass", default='1000',
-                  dest="MASS", help="DM mass")
-parser.add_option("-o", "--oversampling", default='100',
-                  dest="OVERSAMPLING", help="Oversampling factor")
+                  dest="MASS", help="DM mass, default is 1000")
+parser.add_option("-o", "--oversampling", default='200',
+                  dest="OVERSAMPLING", help="Oversampling factor, default is 200")
 parser.add_option("-s", "--syst",default="nominal",
-                  dest="SYST", help="Define systematic variation")
+                  dest="SYST", help="Define systematic variation, default is `nominal`")
+parser.add_option("-n", "--host",default="local",
+                  dest="HOST", help="Define where is it running, `local` or `cluster` default is `local`")
 
 (options,args) = parser.parse_args()
-        
+   
+    
+    
+#This takes some time due to the Jfactors
+print ("Loading the Jfactors... this takes a little while")
+from fluxCalculation import phiDM_ann, phiDM_dec
+cprint ("Done!", "green")
+
+
 mode = options.TYPE
 channel = options.CHANNEL
 profile = options.PROFILE
@@ -127,18 +155,20 @@ profile = options.PROFILE
 LECut = float(options.LECUT)
 HECut = float(options.HECUT)
 
+host = options.HOST
+
 mass = int(options.MASS)
 nOversampling = int(options.OVERSAMPLING)
            
 bins_vars={'energy_rec':np.logspace(1,5,48+1),'psi_rec':np.linspace(0.,np.pi,90+1)}
 
-scrambled_outfile_path = os.path.join(base_path,'PDFs/ScrambledSignal/', mode)
-outfile_path = os.path.join(base_path, 'PDFs/Signal/' + mode)
+scrambled_outfile_path = os.path.join(base_path,'PDFs/ScrambledSignal_v2/', mode)
+outfile_path = os.path.join(base_path, 'PDFs/Signal_v2/' + mode)
+unbinned_path = os.path.join(base_path, 'PDFs/Unbinned/' + mode)
 
-if os.path.exists(scrambled_outfile_path) != True:       
-    os.popen('mkdir -p ' + scrambled_outfile_path)
-if os.path.exists(outfile_path) != True:
-    os.popen('mkdir -p ' + outfile_path)
+os.popen('mkdir -p ' + scrambled_outfile_path)
+os.popen('mkdir -p ' + outfile_path)
+os.popen('mkdir -p ' + unbinned_path)
     
 systematics = options.SYST
     
@@ -153,12 +183,16 @@ outfile_quad = os.path.join(outfile_path,filename_template+'_quad.pkl')
 scrambled_outfile = os.path.join(scrambled_outfile_path,scrambled_filename_template+'.pkl')
 scrambled_outfile_quad = os.path.join(scrambled_outfile_path, scrambled_filename_template + '_quad.pkl')
 
+unbinned_outfile = os.path.join(unbinned_path, "Unbinned_" + filename_template +'.pkl')
+
 print ("Signal PDF outfile : ")
 cprint(os.path.basename(outfile), "green")
 print ("Scrambled PDF outfile : ")
 cprint(os.path.basename(scrambled_outfile), "green")
+print ("Unbinned PDF outfile : ")
+cprint(os.path.basename(unbinned_outfile), "green")
 
-if os.path.isfile(outfile) or os.path.isfile(scrambled_outfile):
+if os.path.isfile(outfile) or os.path.isfile(scrambled_outfile) or os.path.isfile(unbinned_outfile):
     cprint (' ... files already exist!', "red")
     sys.exit(1)
 
@@ -169,7 +203,7 @@ signal_psi_reco = np.array([])
 signal_weight = np.array([])
 scrambled_signal_psi_reco = np.array([])
 
-if halo_found:
+if halo_found and host == "local":
     spinner = Halo(spinner='dots')
 
 for fileType in allFiles['MC'][systematics].keys():
@@ -177,7 +211,7 @@ for fileType in allFiles['MC'][systematics].keys():
     inputfile = allFiles['MC'][systematics][fileType]
     text = "Reading file... %s "%os.path.basename(inputfile)
    
-    if halo_found:
+    if halo_found and host == "local":
         spinner.start(text)
     else:
         print(text)
@@ -220,34 +254,34 @@ for fileType in allFiles['MC'][systematics].keys():
 
     if len(tmp_weight[tmp_weight>0.]) == 0:
         text = "... nothing to do"
-        if halo_found:
+        if halo_found and host == "local":
             spinner.fail(text)
         else:
             cprint (text, "red")    
         continue
    
     if (nOversampling < 0.):
-        if halo_found:
+        if halo_found and host == "local":
             spinner.succeed(" Finished file")
         else: 
             print("Finished file")
         continue
         
-    text = " Oversampling: %i events with factor %i ..." %(len(tmp_weight[tmp_weight>0.]), nOversampling)
 
-    if halo_found:
+    if halo_found and host == "local":
         spinner.succeed(" File loaded!")
-        spinner.start(text)
-    else:
-        print (text)
+    
+    text = " Oversampling: %i events with factor %i ..." %(len(tmp_weight[tmp_weight>0.]), nOversampling)
+    print (text)
 
+    
     oversampled_weight, oversampled_nu_type, oversampled_energy_reco, oversampled_energy_true, oversampled_RA_reco, oversampled_RA_true, oversampled_dec_reco, oversampled_dec_true = oversample(tmp_weight[tmp_weight>0.], tmp_nu_type[tmp_weight>0.], tmp_energy_reco[tmp_weight>0.], tmp_energy_true[tmp_weight>0.], tmp_zenith_reco[tmp_weight>0.], tmp_zenith_true[tmp_weight>0.], tmp_azimuth_reco[tmp_weight>0.], tmp_azimuth_true[tmp_weight>0.], nOversampling)
 
     text = " Oversampling done!"
-    if halo_found:
-        spinner.succeed(text)
+    cprint (text, 'green')
+   
+    if halo_found and host == "local":
         spinner.start(" Calculating DM fluxes...")
-
     else:
         print(text)
    
@@ -291,9 +325,12 @@ for fileType in allFiles['MC'][systematics].keys():
     
         
     
-    if halo_found:
-        spinner.succeed(" Finished with file!")
+    if halo_found and host == "local":
+        spinner.succeed(" Finished with file %s!"%os.path.basename(inputfile))
 
+
+# Saving the numpy arrays 
+        
 hist_pdf_signal = np.histogram2d(signal_energy_reco, signal_psi_reco, bins = (bins_vars['energy_rec'], bins_vars['psi_rec']), weights = signal_weight)
 
 hist_pdf_signal_quad = np.histogram2d(signal_energy_reco,signal_psi_reco, bins =(bins_vars['energy_rec'], bins_vars['psi_rec']),weights = np.power(signal_weight,2))
@@ -302,6 +339,12 @@ scrambled_hist_pdf_signal = np.histogram2d(signal_energy_reco, scrambled_signal_
 
 scrambled_hist_pdf_signal_quad = np.histogram2d(signal_energy_reco, scrambled_signal_psi_reco, bins =(bins_vars['energy_rec'], bins_vars['psi_rec']),weights = np.power(signal_weight,2))
 
+#Saving the unbinned data to quickly create PDFs
+data = {}
+data['energy_reco'] = signal_energy_reco
+data['psi_reco'] = signal_psi_reco
+data['weights'] = signal_weight
+data['scrambled_psi_reco'] = scrambled_signal_psi_reco
 
 
 savefile = open(outfile,'wb')
@@ -315,5 +358,9 @@ pickle.dump(scrambled_hist_pdf_signal, scrambled_savefile)
 
 scrambled_savefile_quad = open(scrambled_outfile_quad,'wb')
 pickle.dump(scrambled_hist_pdf_signal_quad, scrambled_savefile_quad)
+
+unbinned_savefile = open(unbinned_outfile,'wb')
+pickle.dump(data, unbinned_savefile)
+
 
 print (' ... done')

@@ -41,7 +41,7 @@ This scripts calcualtes the sensitivity
 usage = "usage: %prog [options]"
 parser = OptionParser(usage)
 parser.add_option("-t", "--type",default="annihilation",
-                  dest="TYPE", help="Define type of PDF")
+                  dest="TYPE", help="Define DM signal type: annihilation or decay")
 parser.add_option("-c", "--channel",default="nue",
                   dest="CHANNEL", help="Annihilation channel")
 parser.add_option("-x", "--profile",default="NFW",
@@ -96,7 +96,7 @@ if not os.path.exists(out_path):
         
 out_file = os.path.join(out_path, LLH_type + '_' + systematics + '_' + mode  + '_' + profile + '_LEBDT'+str(LECut)+'_HEBDT'+str(HECut)+'_'+channel+'_'+str(mass)+'GeV_'+str(bins_merge_E) + '-'+str(bins_merge_Psi)+'_oversampling'+str(nOversampling)+'_'+str(conf_level)+'CL.npy')
 
-print ("Writing output in \r %s"%outfile)
+print ("Writing output in \r %s"%out_file)
 if os.path.isfile(out_file):
     cprint (" ... already exists", 'red')
     sys.exit(0)
@@ -114,8 +114,12 @@ dm_file = 'PDF_' + systematics_DM + '_DM_' + mode + '_' + profile + 'profile_LEB
 
 dm_scrambled_file = 'PDF_' + systematics_DM + '_DM_FullSkyScrambled_' + mode + '_' + profile + 'profile_LEBDT' + str(LECut)+'_HEBDT'+str(HECut)+ '_2D_'+channel+'_'+str(int(mass))+'GeV_oversampling' + str(nOversampling)
 
-h_DM = np.load(os.path.join(dm_path, dm_file+'.pkl'), allow_pickle = True, encoding='latin1')
-h_DM_W2 = np.load(os.path.join(dm_path, dm_file+'_quad.pkl'), allow_pickle = True, encoding='latin1')
+try:
+    h_DM = np.load(os.path.join(dm_path, dm_file+'.pkl'), allow_pickle = True, encoding='latin1')
+except Exception as e:
+    raise Exception("No Dark Matter PDF found")
+
+    h_DM_W2 = np.load(os.path.join(dm_path, dm_file+'_quad.pkl'), allow_pickle = True, encoding='latin1')
 
 
 h_DM_scrambled = np.load(os.path.join(dm_scrambled_path, dm_scrambled_file+'.pkl'), allow_pickle = True, encoding='latin1')

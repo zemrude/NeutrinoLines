@@ -120,7 +120,7 @@ hist_pdf_signal = np.histogram2d(energy_reco,psi_reco,
                                  bins=(bins_vars['energy_rec'], bins_vars['psi_rec']),weights = weight)
 #hist_pdf_signal_quad = np.histogram2d(energy_reco,psi_reco,
 #                                 bins=(bins_vars['energy_rec'], bins_vars['psi_rec']),weights = weight**2)    
-savefile = open(outfile,'wx')
+savefile = open(outfile,'wb')
 pickle.dump(hist_pdf_signal, savefile)
 
 #savefile_quad = open(outfile_quad,'wx')

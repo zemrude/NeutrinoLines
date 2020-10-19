@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.patches as patches
 
+from matplotlib import gridspec
+
 import pickle
 import sys, os
 
@@ -18,6 +20,13 @@ import scipy.special as sps
 
 from optparse import OptionParser
 
+parser = OptionParser()
+parser.add_option("-p", "--psi", default='90',
+                  dest="PSICUT", help="Cut on Psi")
+(options,args) = parser.parse_args()
+        
+
+psiCut = float(options.PSICUT)/180.*np.pi
 
 ###############################
 
@@ -46,8 +55,6 @@ cutValueString = {'LE': 'LEBDT0.15_HEBDT0.2' , 'HE': 'LEBDT-1.0_HEBDT0.3'}
 
 systematics = ['nominal','DomEffUp','DomEffDown','Ice_HoleIce100_ScatAbs-7','Ice_HoleIce100_Scat+10','Ice_HoleIce100_Abs+10',
               'Ice_HoleIce30_ScatAbs-7','Ice_HoleIce30_Scat+10','Ice_HoleIce30_Abs+10','nominalGammaUp','nominalGammaDown']
-
-psiCut = np.pi/2.
 
 ###############################
 
@@ -113,7 +120,7 @@ def ks_w2(data1, data2, wei1, wei2):
     
     n1 = int(np.sum(wei1)**2/np.sum(wei1**2))
     n2 = int(np.sum(wei2)**2/np.sum(wei2**2))
-
+    
     n_eff = (n1 * n2 / (n1 + n2))
         
     return d , sps.kolmogorov(np.sqrt(n_eff)*d)
@@ -245,18 +252,49 @@ for Datatype in ['Data']:#,'Burnsample']:
 
                 h_bkg_psi[s] = bestFit[s]['n2']*tab_events_atm_psi[s]/livetime[Datatype] + bestFit[s]['n1']*tab_events_corsika_psi/livetime[Datatype] + bestFit[s]['n3']*tab_events_astro_psi[s]/livetime[Datatype]
 
+                
+            h_bkg_energy_stat = np.sqrt(
+                bestFit['nominal']['n1']**2*tabquad_events_corsika_energy
+                + bestFit['nominal']['n2']**2*tabquad_events_atm_energy['nominal']
+                + bestFit['nominal']['n3']**2*tabquad_events_astro_energy['nominal']
+            )/livetime[Datatype]
+                
+                
             h_bkg_energy_syst_min = np.array([])    
             h_bkg_energy_syst_max = np.array([]) 
             for i in range(len(h_bkg_energy['nominal'])):
-                h_bkg_energy_syst_min = np.append(h_bkg_energy_syst_min, np.min([h_bkg_energy[s][i] for s in systematics]))
-                h_bkg_energy_syst_max = np.append(h_bkg_energy_syst_max, np.max([h_bkg_energy[s][i] for s in systematics]))
+                h_bkg_energy_syst_min = np.append(h_bkg_energy_syst_min, 
+                                  h_bkg_energy['nominal'][i] - np.sqrt(
+                                      np.abs(np.min([h_bkg_energy[s][i] for s in systematics])-h_bkg_energy['nominal'][i])**2
+                                  + h_bkg_energy_stat[i]**2
+                                  ))
+                h_bkg_energy_syst_max = np.append(h_bkg_energy_syst_max,
+                                  h_bkg_energy['nominal'][i] + np.sqrt(
+                                      np.abs(np.max([h_bkg_energy[s][i] for s in systematics])-h_bkg_energy['nominal'][i])**2
+                                  + h_bkg_energy_stat[i]**2 
+                                  ))
 
+            h_bkg_psi_stat = np.sqrt(
+                bestFit['nominal']['n1']**2*tabquad_events_corsika_psi
+                + bestFit['nominal']['n2']**2*tabquad_events_atm_psi['nominal']
+                + bestFit['nominal']['n3']**2*tabquad_events_astro_psi['nominal']
+            )/livetime[Datatype]
+                                                  
             h_bkg_psi_syst_min = np.array([])    
             h_bkg_psi_syst_max = np.array([]) 
             for i in range(len(h_bkg_psi['nominal'])):
-                h_bkg_psi_syst_min = np.append(h_bkg_psi_syst_min, np.min([h_bkg_psi[s][i] for s in systematics]))
-                h_bkg_psi_syst_max = np.append(h_bkg_psi_syst_max, np.max([h_bkg_psi[s][i] for s in systematics]))
+                h_bkg_psi_syst_min = np.append(h_bkg_psi_syst_min,
+                                   h_bkg_psi['nominal'][i] - np.sqrt(
+                                       np.abs(np.min([h_bkg_psi[s][i] for s in systematics])-h_bkg_psi['nominal'][i])**2
+                                        + h_bkg_psi_stat[i]**2 
+                                           ))
+                h_bkg_psi_syst_max = np.append(h_bkg_psi_syst_max,
+                                    h_bkg_psi['nominal'][i] + np.sqrt(
+                                           np.abs(np.max([h_bkg_psi[s][i] for s in systematics])-h_bkg_psi['nominal'][i])**2
+                                               + h_bkg_psi_stat[i]**2 
+                                           ))
 
+  
             # calculate p-values
             # 1) weighted two-sample KS
 
@@ -283,7 +321,6 @@ for Datatype in ['Data']:#,'Burnsample']:
                        (
                           (((h_bkg_energy_syst_max[expectation_energy>0.] - h_bkg_energy_syst_min[expectation_energy>0.])
                            *livetime[Datatype] ) **2  )
-                           +  expectation_energy[expectation_energy>0.]
                        )
                     )
             p_syst_energy = distributions.chi2.sf(chi2_syst_energy, len(expectation_energy[expectation_energy>0.]) - 1)
@@ -295,7 +332,6 @@ for Datatype in ['Data']:#,'Burnsample']:
                     (
                        (((h_bkg_psi_syst_max[expectation_psi>0.] - h_bkg_psi_syst_min[expectation_psi>0.])
                          *livetime[Datatype] ) **2 )
-                        + expectation_psi[expectation_psi>0.]
                     )
                  )
             p_syst_psi = distributions.chi2.sf(chi2_syst_psi, len(expectation_psi[expectation_psi>0.]) - 1)
@@ -306,13 +342,25 @@ for Datatype in ['Data']:#,'Burnsample']:
             #################
             #################
 
-            fig,(ax1,ax2) = plt.subplots(1,2,figsize=(20,8))
+            #fig,(ax1,ax2) = plt.subplots(1,2,figsize=(20,8))
+
+            fig = plt.figure()
+            
+            fig = plt.figure(figsize=(20,12)) 
+            gs = gridspec.GridSpec(2, 2, height_ratios=[2, 1]) 
+
+            ax1_ratio = plt.subplot(gs[2])
+            ax2_ratio = plt.subplot(gs[3])
+
+            ax1 = plt.subplot(gs[0], sharex = ax1_ratio)
+            ax2 = plt.subplot(gs[1], sharex = ax2_ratio)
+            
+            fig.subplots_adjust(hspace = 0.1)
 
             
             #################
-            ax1.errorbar(binCenters_energy, tab_events_data_energy/livetime[Datatype], np.sqrt(tab_events_data_energy)/livetime[Datatype], xerr=None, color='k', marker='o',markersize=2, lw=2, zorder=10, ls=None, label=Datatype+' ({} events)'.format(len(d_data_energy)))
+            ax1.errorbar(binCenters_energy, tab_events_data_energy/livetime[Datatype], np.sqrt(tab_events_data_energy)/livetime[Datatype], xerr=None, color='k', marker='o',markersize=4, lw=2, zorder=10, ls='none', label=Datatype+' ({} events)'.format(len(d_data_energy)))
 
-            #ax.step(binCenters_energy,bestFit_energy['n1']*h_corsika,label='Original Corsika',where='mid',color='magenta',lw=1)
             ax1.step(binCenters_energy,bestFit['nominal']['n3']*tab_events_astro_energy['nominal']/livetime[Datatype],where='mid',color = 'b', label=r'Astrophysical $\nu$', alpha = 0.5, lw=2)
             ax1.step(binCenters_energy,bestFit['nominal']['n2']*tab_events_atm_energy['nominal']/livetime[Datatype],where='mid',color = 'g', label=r'Atmosperic $\nu$', alpha = 0.5, lw=2)
             ax1.step(binCenters_energy,bestFit['nominal']['n1']*tab_events_corsika_energy/livetime[Datatype],where='mid',color = 'orange', label='Corsika', alpha = 0.5, lw=2)
@@ -332,17 +380,31 @@ for Datatype in ['Data']:#,'Burnsample']:
             order = [5,4,3,6,2,1,0]
             leg = ax1.legend([handles[idx] for idx in order], [labels[idx] for idx in order], frameon = 1, fancybox=False, loc='upper right')
 
-            ax1.set_xlabel(r"E$_{\mathrm{reco}}$ (GeV)")
-            ax1.set_xscale('log')
-            ax1.set_xlim(1e1,1e5)
+            #ax1.set_xlabel(r"E$_{\mathrm{reco}}$ (GeV)")
+            #ax1.set_xscale('log')
+            #ax1.set_xlim(1e1,1e5)
             ax1.set_ylim(1e-9,1e-4)
             ax1.set_ylabel(r"rate (Hz)")
             ax1.set_yscale('log')
+            plt.setp(ax1.get_xticklabels(), visible=False)
 
+            
+            ax1_ratio.errorbar(binCenters_energy, tab_events_data_energy/h_bkg_energy['nominal']/livetime[Datatype], np.sqrt(tab_events_data_energy)/h_bkg_energy['nominal']/livetime[Datatype], xerr=None, color='k', marker='o',markersize=4, lw=2, zorder=10, ls='none', label=Datatype+' ({} events)'.format(len(d_data_energy)))
+            
+            ax1_ratio.fill_between(binCenters_energy, h_bkg_energy_syst_min/h_bkg_energy['nominal'], h_bkg_energy_syst_max/h_bkg_energy['nominal'], step='mid',color='r',alpha=0.5,lw=0)
 
+            ax1_ratio.step(binCenters_energy,h_bkg_energy['nominal']/h_bkg_energy['nominal'],where='mid',color = 'r', lw=3)
+            
+            
+            ax1_ratio.set_xlabel(r"E$_{\mathrm{reco}}$ (GeV)")
+            ax1_ratio.set_xscale('log')
+            ax1_ratio.set_xlim(1e1,1e5)
+            ax1_ratio.set_ylabel(r"ratio")
+            ax1_ratio.set_ylim(0.5,1.5)
+            #ax1.set_yscale('log')
             #################
                         
-            ax2.errorbar(binCenters_psi, tab_events_data_psi/livetime[Datatype], np.sqrt(tab_events_data_psi)/livetime[Datatype], xerr=None, color='k', marker='o',markersize=2, lw=2, zorder=10, ls=None, label=Datatype+' ({} events)'.format(len(d_data_psi)))
+            ax2.errorbar(binCenters_psi, tab_events_data_psi/livetime[Datatype], np.sqrt(tab_events_data_psi)/livetime[Datatype], xerr=None, color='k', marker='o',markersize=4, lw=2, zorder=10, ls='none', label=Datatype+' ({} events)'.format(len(d_data_psi)))
 
             #ax.step(binCenters_psi,bestFit_energy['n1']*h_corsika,label='Original Corsika',where='mid',color='magenta',lw=1)
             ax2.step(binCenters_psi,bestFit['nominal']['n3']*tab_events_astro_psi['nominal']/livetime[Datatype],where='mid',color = 'b', label=r'Astrophysical $\nu$', alpha = 0.5, lw=2)
@@ -364,20 +426,38 @@ for Datatype in ['Data']:#,'Burnsample']:
                      
             leg = ax2.legend([handles[idx] for idx in order], [labels[idx] for idx in order],frameon = 1, fancybox=False, loc='upper left')
 
-            ax2.set_xlabel(r"$\Psi_{\mathrm{reco}}$ (degrees)")
-            ax2.set_xlim(0,180)
+            #ax2.set_xlabel(r"$\Psi_{\mathrm{reco}}$ (degrees)")
+            #ax2.set_xlim(0,180)
             ax2.set_ylim(1e-7,1e-4)
             ax2.set_ylabel(r"rate (Hz)")
             ax2.set_yscale('log')
+            plt.setp(ax2.get_xticklabels(), visible=False)
 
+            
+            ax2_ratio.errorbar(binCenters_psi, tab_events_data_psi/h_bkg_psi['nominal']/livetime[Datatype], np.sqrt(tab_events_data_psi)/h_bkg_psi['nominal']/livetime[Datatype], xerr=None, color='k', marker='o',markersize=4, lw=2, zorder=10, ls='none', label=Datatype+' ({} events)'.format(len(d_data_psi)))
+            
+            ax2_ratio.fill_between(binCenters_psi, h_bkg_psi_syst_min/h_bkg_psi['nominal'], h_bkg_psi_syst_max/h_bkg_psi['nominal'], step='mid',color='r',alpha=0.5,lw=0)
+
+            ax2_ratio.step(binCenters_psi,h_bkg_psi['nominal']/h_bkg_psi['nominal'],where='mid',color = 'r', lw=3)
+            
+            
+            ax2_ratio.set_xlabel(r"$\Psi_{\mathrm{reco}}$ (degrees)")
+            ax2_ratio.set_xlim(0,180)
+            ax2_ratio.set_ylabel(r"ratio")
+            ax2_ratio.set_ylim(0.8,1.2)
+            #ax1.set_yscale('log')
+            
+            
+            
+            
             fig.suptitle(sample+r' Sample ($\Psi_{\mathrm{reco}}$>'+str(int(psiCut/np.pi*180))+'$^\circ$); '+
-                         r'$n_{\mu}$='+'{:.3f}, '.format(bestFit['nominal']['n1'])+
-                         r'$n_{\nu}^{atm}$='+'{:.3f}, '.format(bestFit['nominal']['n2'])+
-                         r'$n_{\nu}^{ast}$='+'{:.3f}, '.format(bestFit['nominal']['n3'])
+                         r'$n_{\mu}$='+'{:.2f}, '.format(bestFit['nominal']['n1'])+
+                         r'$n_{\nu}^{atm}$='+'{:.2f}, '.format(bestFit['nominal']['n2'])+
+                         r'$n_{\nu}^{ast}$='+'{:.2f}, '.format(bestFit['nominal']['n3'])
                          ,fontsize=24)
 
-            fig.savefig('plots/PreUnblinding_ControlDistribution_'+Datatype+'_'+sample+'-Sample.png',bbox='tight')
-            fig.savefig('plots/PreUnblinding_ControlDistribution_'+Datatype+'_'+sample+'-Sample.pdf',bbox='tight')
+            fig.savefig('plots/PreUnblinding_ControlDistribution_'+Datatype+'_'+sample+'-Sample_'+options.PSICUT+'.png',bbox='tight')
+            fig.savefig('plots/PreUnblinding_ControlDistribution_'+Datatype+'_'+sample+'-Sample_'+options.PSICUT+'.pdf',bbox='tight')
 
 
             #################
@@ -442,5 +522,5 @@ for Datatype in ['Data']:#,'Burnsample']:
             
             fig2.suptitle(sample+r' Sample ($\Psi_{\mathrm{reco}}$>'+str(int(psiCut/np.pi*180))+'$^\circ$)' ,fontsize=24)
 
-            fig2.savefig('plots/PreUnblinding_ControlDistribution_'+Datatype+'_'+sample+'-Sample_CDF.pdf',bbox='tight')
-            fig2.savefig('plots/PreUnblinding_ControlDistribution_'+Datatype+'_'+sample+'-Sample_CDF.png',bbox='tight')
+            fig2.savefig('plots/PreUnblinding_ControlDistribution_'+Datatype+'_'+sample+'-Sample_CDF_'+options.PSICUT+'.pdf',bbox='tight')
+            fig2.savefig('plots/PreUnblinding_ControlDistribution_'+Datatype+'_'+sample+'-Sample_CDF_'+options.PSICUT+'.png',bbox='tight')
