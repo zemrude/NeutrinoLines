@@ -1,0 +1,16 @@
+executable = /data/ana/BSM/HT_Cascade/FinalAnalysisCode/python/SensitivityCalculation_xi.py
+
+logdir = /scratch/aguilar/log/
+output = $(logdir)$(JOBNAME).$(Cluster).out
+error = $(logdir)$(JOBNAME).$(Cluster).err
+log = $(logdir)$(JOBNAME).$(Cluster).log
+
+notification   = never 
+universe       = vanilla
+
+should_transfer_files = YES
+request_memory = 10000
++AccountingGroup="1_week.aguilar"
+
+arguments = -t $(TYPE) -c $(CHANNEL) -x $(PROFILE) -s $(SYST) -m $(MASS) -d $(LLH)
+queue
