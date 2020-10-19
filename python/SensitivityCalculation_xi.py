@@ -94,23 +94,32 @@ LLH_type = options.LLH
 
 livetime  = 28272940. + 30674072. + 31511810.5 + 31150852. + 30059465.  
 
-out_path = os.path.join(base_path, 'sensitivity', mode, channel, systematics)
+out_path = os.path.join(base_path, 'sensitivity', mode, channel, systematics, LLH_type)
 
 if not os.path.exists(out_path):
         os.popen('mkdir -p '+out_path)
         
-out_file = os.path.join(out_path, 'Sensitivity_' + LLH_type + '_' 
-                        + systematics + '_' + mode + '_' + profile + 
-                        'profile_LEBDT' + str(LECut) + '_HEBDT' + 
-                        str(HECut) + '_' + channel + 
-                        '_' + str(mass) + 
-                        'GeV_oversampling' + 
-                        str(nOversampling) + '_' + str(conf_level) + 'CL.npy')
+out_file = os.path.join(out_path, 'Sensitivity' + 
+                        '_' + str(LLH_type) + 
+                        '_' + systematics + 
+                        '_' + mode + 
+                        '_' + profile + 
+                        '_a' + str(LECut) + 
+                        '_b' + str(HECut) + 
+                        '_' + channel + 
+                        '_m' + str(mass) + 
+                        '_o' + str(nOversampling) + 
+                        '_p'  + str(precision) + 
+                        '_CL' + str(conf_level) + 
+                        '_n' + str(negative_signal) + 
+                        '.npy')
 
 if os.path.isfile(out_file):
     print (' ... already exists')
     sys.exit(0)
 
+print("Writing file", colored(os.path.basename(out_file), "green"))
+    
 ##-----------------------------#
 #      Loading histograms     #
 #-----------------------------#
