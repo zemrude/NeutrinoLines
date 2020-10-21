@@ -328,7 +328,7 @@ class Profile_Analyser:
     
     
     
-class Profile_Analyser_Normalised:
+class Likelihood_Analyser:
 
     def __init__(self):
         
@@ -362,7 +362,6 @@ class Profile_Analyser_Normalised:
         
         self.moreOutput = False
         self.AllowNegativeSignal = False
-        self.no_empty_bins = False
         
 
     def setLLHtype(self,type):
@@ -375,9 +374,6 @@ class Profile_Analyser_Normalised:
     def saveMoreOutput(self):
         self.moreOutput = True
 
-    def setEmptyBins(self):
-        self.no_empty_bins = True
-
     def allowNegativeSignal(self):
         self.AllowNegativeSignal = True 
         print(" Allowing for negative signal") 
@@ -385,24 +381,15 @@ class Profile_Analyser_Normalised:
     def loadBackgroundPDF(self, pdf, verbose = False):
         self.backgroundPDF = pdf.flatten()    
         self.nTotalEvents = np.sum(pdf)
-#        self.backgroundPDF = pdf.flatten()/np.sum(pdf)
+        self.backgroundPDF = pdf.flatten()/np.sum(pdf)
 
         if verbose:
             print('Total number of expected background events:', self.nTotalEvents)
         if not self.baseline_init:
             print("Initalizing the baseline pdf")
-            self.baseline_backgroundPDF = self.backgroundPDF/self.nTotalEvents
+            self.baseline_backgroundPDF = self.backgroundPDF
             self.baseline_init = True
-            
-
-        if self.no_empty_bins:
-            mask = (self.backgroundPDF == 0)
-            self.backgroundPDF[mask] = ConfidenceIntervalError(self.backgroundPDF[mask])
-        
-        #Normalizing
-        self.backgroundPDF = self.backgroundPDF/np.sum(self.backgroundPDF)
-
-            
+                        
         self.nbins = len(pdf.flatten())
 
     def loadSignalPDF(self,pdf):

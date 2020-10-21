@@ -175,11 +175,11 @@ cprint("Done", "green")
 
     
 #-----------------------------#
-#    use SimpleLLHanalyser    #
+#    use LLHanalyser          #
 #-----------------------------#
 import LLHAnalyser
                                                  
-analysis = LLHAnalyser.Profile_Analyser_Normalised()
+analysis = LLHAnalyser.Likelihood_Analyser()
 analysis.saveMoreOutput()
 
 #Load the necessary histograms. Scrambled signal is needed for generating pseudo-trials
