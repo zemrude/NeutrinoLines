@@ -32,8 +32,15 @@ from termcolor import colored, cprint
 r"""
     SensitivityCalculation_xi.py
     ----------------------------
-    Calculates the Sensitivity
+    Calculates the Sensitivity with both Liklihood intervals and Frequentist approach
     
+    Output
+    ------
+    numpy file with 4 objects [sens, sensflux, freq_sens, freq_sensflux]
+    sens: float, median sensitivity for likelihood interval
+    freq_sens: float, median sensitivity for frequentist interval
+    sensflux: dict, median sensitivity in terms of sv for annihilation or tau for decay for l.i.
+    freq_sensflux: dict, median sensitivity in terms of sv for annihilation or tau for decay for f.i.
 
 """
 
@@ -55,8 +62,8 @@ parser.add_option("-d", "--llh", default='Poisson',
                   dest="LLH", help="LLH type, default is `Poisson`")
 parser.add_option("-n", "--neg", default=False,
                   dest="NEG", help="Allow fitting negative ns, default is `False`")
-parser.add_option("-p", "--prec", default=0.5,
-                  dest="PREC", help="Frequentist precission in conf-level, default is `0.5`")
+parser.add_option("-p", "--prec", default=0.1,
+                  dest="PREC", help="Frequentist precission in conf-level, default is `0.1`")
 
 (options,args) = parser.parse_args()
         
@@ -67,7 +74,7 @@ systematics = options.SYST
 negative_signal = options.NEG
 precision = float(options.PREC)
 
-LEmasses = [40, 63, 100, 158, 251, 398, 631]
+LEmasses = [10, 16, 25, 40, 63, 100, 158, 251, 398, 631]
 HEmasses = [1000, 1585, 2512, 3981, 6310, 10000, 15850, 25120, 39810]
 
 all_masses = np.append(LEmasses,HEmasses)
@@ -83,10 +90,10 @@ HECuts = [-1.0,0.3]
 
 if mass in LEmasses:
     LECut,HECut = LECuts
-    nOversampling = 100
 else:
     LECut,HECut = HECuts
-    nOversampling = 200
+
+nOversampling = 200
     
 conf_level = int(options.CONFLEVEL)
 
@@ -108,7 +115,6 @@ out_file = os.path.join(out_path, 'Sensitivity' +
                         '_b' + str(HECut) + 
                         '_' + channel + 
                         '_m' + str(mass) + 
-                        '_o' + str(nOversampling) + 
                         '_p'  + str(precision) + 
                         '_CL' + str(conf_level) + 
                         '_n' + str(negative_signal) + 
@@ -200,28 +206,37 @@ sens = analysis.CalculateSensitivity(Ntrials, conf_level)
 print('Likelihood interval median sensitivity xi=',sens['median'])
 print('Median sensitivity xs=',sens['median']*np.sum(h_bkg)/np.sum(h_DM)*10**-23)
 
-sens['mass'] = mass
+sensflux = {}
+sensflux['mass'] = mass
 
 if mode == 'annihilation':
 
-    sens['error_68_low'] = sens['error_68_low'] * np.sum(h_bkg) / np.sum(h_DM)*10**-23
-    sens['error_68_high'] = sens['error_68_high'] * np.sum(h_bkg) / np.sum(h_DM)*10**-23
-    sens['error_95_low'] = sens['error_95_low'] * np.sum(h_bkg) / np.sum(h_DM)*10**-23
-    sens['error_95_high'] = sens['error_95_high'] * np.sum(h_bkg) / np.sum(h_DM)*10**-23   
-    sens['median'] = sens['median'] * np.sum(h_bkg) / np.sum(h_DM)*10**-23
+    sensflux['error_68_low'] = sens['error_68_low'] * np.sum(h_bkg) / np.sum(h_DM)*10**-23
+    sensflux['error_68_high'] = sens['error_68_high'] * np.sum(h_bkg) / np.sum(h_DM)*10**-23
+    sensflux['error_95_low'] = sens['error_95_low'] * np.sum(h_bkg) / np.sum(h_DM)*10**-23
+    sensflux['error_95_high'] = sens['error_95_high'] * np.sum(h_bkg) / np.sum(h_DM)*10**-23   
+    sensflux['median'] = sens['median'] * np.sum(h_bkg) / np.sum(h_DM)*10**-23
 
 elif mode == 'decay':
-    sens['error_68_low'] = 1. / sens['error_68_low'] / np.sum(hbkg) * np.sum(h_DM)*10**28
-    sens['error_68_high'] = 1. / sens['error_68_high'] / np.sum(h_bkg) * np.sum(h_DM)*10**28
-    sens['error_95_low'] = 1. / sens['error_95_low'] / np.sum(h_bkg) * np.sum(h_DM)*10**28
-    sens['error_95_high'] = 1. / sens['error_95_high'] / np.sum(h_bkg) * np.sum(h_DM)*10**28
-    sens['median'] = 1. / sens['median'] / np.sum(h_bkg) * np.sum(h_DM)*10**28
+    sensflux['error_68_low'] = 1. / sens['error_68_low'] / np.sum(hbkg) * np.sum(h_DM)*10**28
+    sensflux['error_68_high'] = 1. / sens['error_68_high'] / np.sum(h_bkg) * np.sum(h_DM)*10**28
+    sensflux['error_95_low'] = 1. / sens['error_95_low'] / np.sum(h_bkg) * np.sum(h_DM)*10**28
+    sensflux['error_95_high'] = 1. / sens['error_95_high'] / np.sum(h_bkg) * np.sum(h_DM)*10**28
+    sensflux['median'] = 1. / sens['median'] / np.sum(h_bkg) * np.sum(h_DM)*10**28
     #sens['5Sigma_DiscoveryPotential'] = 1./analysis.CalculateDiscoveryPotential(5)/np.sum(h_bkg)*np.sum(h_DM)*10**28
     #sens['Neyman_sensitivity'] = 1./sens['Neyman_sensitivity']/np.sum(h_bkg)*np.sum(h_DM)*10**28
 
 
 freq_sens = analysis.CalculateFrequentistSensitivity(conf_level, precision)
-    
+freq_sensflux = {}
+
+if mode == 'annihilation':
+    freq_sensflux['median'] =  freq_sens[0] * np.sum(h_bkg) / np.sum(h_DM)*10**-23
+elif mode == 'decay':
+    freq_sensflux['median'] =  1./ freq_sens[0] / np.sum(hbkg) * np.sum(h_DM)*10**28
+
+freq_sensflux['mass'] = mass
+
 print ("Saving results to %s"%out_file)
 
-np.save(out_file,[sens, freq_sens])
+np.save(out_file, [sens, sensflux, freq_sens, freq_sensflux])

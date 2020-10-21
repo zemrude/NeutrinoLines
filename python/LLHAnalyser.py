@@ -5,7 +5,17 @@ from utils import ConfidenceIntervalError
 
 from sensitivity_utils import BinomialError, inv_BinomialError
 
-
+class sensitivity:
+    def __init__(self):
+        self.xi = 0 # 
+        self.sv = 0
+        self.error68_low = 0
+        self.error68_high = 0
+        self.error95_low = 0
+        self.error95_high = 0
+        self.mass = 0
+        
+     
 class Profile_Analyser:
 
     def __init__(self):
@@ -372,7 +382,7 @@ class Profile_Analyser_Normalised:
         self.AllowNegativeSignal = True 
         print(" Allowing for negative signal") 
 
-    def loadBackgroundPDF(self,pdf, verbose = False):
+    def loadBackgroundPDF(self, pdf, verbose = False):
         self.backgroundPDF = pdf.flatten()    
         self.nTotalEvents = np.sum(pdf)
 #        self.backgroundPDF = pdf.flatten()/np.sum(pdf)
@@ -760,7 +770,7 @@ class Profile_Analyser_Normalised:
         if self.moreOutput:
             dic_brazilian['upperlimits'] = upperlimits
             dic_brazilian['bestFits'] = fits
-            
+        
                         
         return dic_brazilian   
     
