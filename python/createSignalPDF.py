@@ -230,6 +230,9 @@ for fileType in allFiles['MC'][systematics].keys():
     tmp_zenith_true = np.array(fileData['all']['zenith_true'])
     tmp_azimuth_true = np.array(fileData['all']['azimuth_true'])
 
+    tmp_psi_true = np.array(fileData['all']['psi_true'])
+    tmp_psi_reco = np.array(fileData['all']['psi_rec'])
+    
     BDTScore_LE = np.array(fileData['all']['BDTScore_bb100'])
     BDTScore_HE = np.array(fileData['all']['BDTScore_ww300'])
 
@@ -252,6 +255,8 @@ for fileType in allFiles['MC'][systematics].keys():
 
     tmp_weight = tmp_weight/nfiles[systematics][fileType]
 
+    print("\nTotal weight before oversampling %f "%np.sum(tmp_weight))
+    
     if len(tmp_weight[tmp_weight>0.]) == 0:
         text = "... nothing to do"
         if halo_found and host == "local":
@@ -260,34 +265,47 @@ for fileType in allFiles['MC'][systematics].keys():
             cprint (text, "red")    
         continue
    
-    if (nOversampling < 0.):
-        if halo_found and host == "local":
-            spinner.succeed(" Finished file")
-        else: 
-            print("Finished file")
-        continue
         
 
     if halo_found and host == "local":
         spinner.succeed(" File loaded!")
     
-    text = " Oversampling: %i events with factor %i ..." %(len(tmp_weight[tmp_weight>0.]), nOversampling)
-    print (text)
+    
+    if (nOversampling == -1):
+        cprint ("No oversampling!!")
+        oversampled_weight = tmp_weight[tmp_weight>0.]
+        oversampled_nu_type = tmp_nu_type[tmp_weight>0.]
+        oversampled_energy_true = tmp_energy_true[tmp_weight>0.]
+        oversampled_energy_reco = tmp_energy_reco[tmp_weight>0.]
+       
+        #We assume zenith is declination. This is needed for the scrambled psi 
+        oversampled_dec_reco = tmp_zenith_reco[tmp_weight>0.] - np.pi/2. 
+        oversampled_psi_true = tmp_psi_true[tmp_weight>0.]
+        oversampled_psi_reco = tmp_psi_reco[tmp_weight>0.]
+        
+    else:
+        text = " Oversampling: %i events with factor %i ..." %(len(tmp_weight[tmp_weight>0.]), nOversampling)
+        print (text)
 
     
-    oversampled_weight, oversampled_nu_type, oversampled_energy_reco, oversampled_energy_true, oversampled_RA_reco, oversampled_RA_true, oversampled_dec_reco, oversampled_dec_true = oversample(tmp_weight[tmp_weight>0.], tmp_nu_type[tmp_weight>0.], tmp_energy_reco[tmp_weight>0.], tmp_energy_true[tmp_weight>0.], tmp_zenith_reco[tmp_weight>0.], tmp_zenith_true[tmp_weight>0.], tmp_azimuth_reco[tmp_weight>0.], tmp_azimuth_true[tmp_weight>0.], nOversampling)
-
-    text = " Oversampling done!"
-    cprint (text, 'green')
+        oversampled_weight, oversampled_nu_type, oversampled_energy_reco, oversampled_energy_true, oversampled_RA_reco, oversampled_RA_true, oversampled_dec_reco, oversampled_dec_true = oversample(tmp_weight[tmp_weight>0.], tmp_nu_type[tmp_weight>0.], tmp_energy_reco[tmp_weight>0.], tmp_energy_true[tmp_weight>0.], tmp_zenith_reco[tmp_weight>0.], tmp_zenith_true[tmp_weight>0.], tmp_azimuth_reco[tmp_weight>0.], tmp_azimuth_true[tmp_weight>0.], nOversampling)
+        
+        #Calculate the true and reco angular distance to the GC for the DM flux
+    
+        oversampled_psi_true = psi_f(oversampled_RA_true[oversampled_weight>0.],oversampled_dec_true[oversampled_weight>0.])               
+        oversampled_psi_reco = psi_f(oversampled_RA_reco[oversampled_weight>0.],oversampled_dec_reco[oversampled_weight>0.])
+    
+        text = " Oversampling done!"
+        cprint (text, 'green')
    
+    print ("\nTotal weight after oversampling %f "%np.sum(new_weight))
+    
     if halo_found and host == "local":
         spinner.start(" Calculating DM fluxes...")
     else:
         print(text)
    
-    #Calculate the true angular distance to the GC for the DM flux
-    
-    oversampled_psi_true = psi_f(oversampled_RA_true[oversampled_weight>0.],oversampled_dec_true[oversampled_weight>0.])                     
+          
                            
     if mode == 'annihilation':
         oversampled_flux = phiDM_ann(mass,channel,profile,
@@ -307,19 +325,20 @@ for fileType in allFiles['MC'][systematics].keys():
     new_weight = oversampled_weight[oversampled_weight>0.]*oversampled_flux
     new_energy_reco = oversampled_energy_reco[oversampled_weight>0.]
     new_dec_reco = oversampled_dec_reco[oversampled_weight>0.]
-    new_ra_reco = oversampled_RA_reco[oversampled_weight>0.]
+    #new_ra_reco = oversampled_RA_reco[oversampled_weight>0.]
     
-    oversampled_psi_reco = psi_f(oversampled_RA_reco[oversampled_weight>0.],oversampled_dec_reco[oversampled_weight>0.])
     
     new_psi_reco = oversampled_psi_reco[oversampled_weight>0.]                   
-
+        
+        
+    
     signal_energy_reco = np.append(signal_energy_reco, new_energy_reco)
-    signal_psi_reco = np.append(signal_psi_reco, oversampled_psi_reco)
+    signal_psi_reco = np.append(signal_psi_reco, new_psi_reco)
     signal_weight = np.append(signal_weight,new_weight)     
     
     
     #Now we scrambled, we take a random RA from 0 - 2pi and recalculate a psi_reco
-    scrambled_RA_reco = np.random.random_sample((len(new_ra_reco),)) * 2*np.pi
+    scrambled_RA_reco = np.random.random_sample((len(new_weight),)) * 2*np.pi
     scrambled_psi_reco = psi_f(scrambled_RA_reco, new_dec_reco)                     
     scrambled_signal_psi_reco = np.append(scrambled_signal_psi_reco, scrambled_psi_reco)
     
