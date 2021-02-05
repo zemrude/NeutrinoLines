@@ -57,7 +57,6 @@ r"""
 from fileList import nfiles, allFiles
 from IceCube_sim import genie_correction_factor
 
-
 def oversample(tmp_weight, tmp_nu_type,
                tmp_energy_reco, tmp_energy_true,
                tmp_zenith_reco, tmp_zenith_true,
@@ -298,7 +297,7 @@ for fileType in allFiles['MC'][systematics].keys():
         text = " Oversampling done!"
         cprint (text, 'green')
    
-    print ("\nTotal weight after oversampling %f "%np.sum(new_weight))
+    print ("\nTotal weight after oversampling %f "%np.sum(oversampled_weight))
     
     if halo_found and host == "local":
         spinner.start(" Calculating DM fluxes...")

@@ -4,6 +4,7 @@ from iminuit import Minuit
 from utils import ConfidenceIntervalError
 
 from sensitivity_utils import BinomialError, inv_BinomialError
+from numba import jit, njit
 
 class sensitivity:
     def __init__(self):
@@ -323,10 +324,20 @@ class Profile_Analyser:
 
         return dic_brazilian
     
-    
-    
-    
-    
+@jit(nopython=True)       
+def randomize(observationPDF):
+    observation = np.zeros(np.shape(observationPDF))
+
+    for i in range(len(observationPDF)):
+        observation[i] = np.random.poisson(observationPDF[i])
+      
+    return observation
+
+kwd = {"parallel": True, "fastmath": True}
+
+@njit(**kwd)
+def nb_log(val):
+    return np.log(val)
     
 class Likelihood_Analyser:
 
@@ -380,16 +391,18 @@ class Likelihood_Analyser:
 
     def loadBackgroundPDF(self, pdf, verbose = False):
         self.backgroundPDF = pdf.flatten()    
-        self.nTotalEvents = np.sum(pdf)
         self.backgroundPDF = pdf.flatten()/np.sum(pdf)
 
-        if verbose:
-            print('Total number of expected background events:', self.nTotalEvents)
         if not self.baseline_init:
             print("Initalizing the baseline pdf")
-            self.baseline_backgroundPDF = self.backgroundPDF
+            self.baseline_backgroundPDF = pdf.flatten()
             self.baseline_init = True
-                        
+            self.nTotalEvents = np.sum(pdf)
+            self.baseline_backgroundPDF = pdf.flatten()/self.nTotalEvents
+            if verbose:
+                print('Total number of expected background events:', self.nTotalEvents)
+      
+            
         self.nbins = len(pdf.flatten())
 
     def loadSignalPDF(self,pdf):
@@ -401,7 +414,7 @@ class Likelihood_Analyser:
             raise ValueError('Shape of signal pdf does not match the background pdf! Did you initialize the background pdf first?')
     
     def loadUncertaintyPDFs(self,bkg_pdf,sig_pdf):
-        #This are sigma**2 hence, the normalization also needs to be squared
+        #These are sigma**2 hence, the normalization also needs to be squared
         self.backgroundPDF_uncert2 = bkg_pdf.flatten()/self.nTotalEvents**2
         self.signalPDF_uncert2 = sig_pdf.flatten()/self.nSignalEvents**2
 
@@ -427,7 +440,7 @@ class Likelihood_Analyser:
         
         if self.nbins != len(pdf.flatten()):
             raise ValueError('Shape of signal contamination uncertainty pdf does not match the background pdf!')
-        
+   
     def sampleObservation(self,xi):
 
         if not self.ready:
@@ -435,12 +448,9 @@ class Likelihood_Analyser:
         #We use always the baseline PDF, this does not get updated
         observationPDF = self.nTotalEvents* ((1-xi)*self.baseline_backgroundPDF + xi*self.signalPDF)
 
-        self.observation=np.zeros(np.shape(self.backgroundPDF))
+        self.observation=np.zeros(np.shape(self.baseline_backgroundPDF))
         for i in range(len(self.observation)):
-            if observationPDF[i] == 0:
-                self.observation[i]=np.random.poisson(1.02) # Poisson mean with 90% below 2.3
-            else:
-                self.observation[i]=np.random.poisson(observationPDF[i])
+            self.observation[i]=np.random.poisson(observationPDF[i])
         
         self.computedBestFit = False
         
@@ -451,7 +461,38 @@ class Likelihood_Analyser:
         
         scrambledPDF = self.nTotalEvents* ((1-xi)*self.baseline_backgroundPDF + xi*self.signalContaminationPDF)
         self.loadBackgroundPDF(scrambledPDF)
+    
+    def sampleObservationN(self, n):
+
+        if not self.ready:
+            raise ValueError('Not all pdfs are correctly loaded!')
         
+        if (n != 0):
+            n_poisson = np.random.poisson(n)
+            xi = n_poisson/self.nTotalEvents
+        else:
+            xi = 0
+            
+        #We use always the baseline PDF, this does not get updated
+        observationPDF = self.nTotalEvents* ((1-xi)*self.baseline_backgroundPDF + xi*self.signalPDF)
+
+        self.observation = randomize(observationPDF)
+        
+        self.computedBestFit = False
+        
+        r"""
+        Once we have a new dataset, our background estimate has to change! as the scrambled background is taken from data
+        The following is an approximation: In reality we should the invidual events of the pseudosample and scrambled their RA. Instead we are going to construct a PDF using the scrambled signal.
+        """
+        
+        scrambledPDF = self.nTotalEvents* ((1-xi)*self.baseline_backgroundPDF + xi*self.signalContaminationPDF)
+       
+        #print(self.nTotalEvents)
+        #print("new scrambled pdf {}".format(np.sum(scrambledPDF)))
+        
+        self.loadBackgroundPDF(scrambledPDF)
+        
+
         
     def evaluateLLH(self, xi):
         
@@ -555,6 +596,7 @@ class Likelihood_Analyser:
         else:
             lower_bound = 0.
         
+        #LLHmin_DM = minimize(self.evaluateLLH)
         LLHmin_DM=Minuit(self.evaluateLLH,
              xi=0.1, error_xi=.01,
              limit_xi=(lower_bound,2.),
@@ -603,6 +645,9 @@ class Likelihood_Analyser:
         param_up=self.bestFit['xi']
         param_mean=self.bestFit['xi']
         
+        if param_up == 0:
+            param_up = 0.001
+        
         dTS=0
         cc=1
         while((dTS<deltaTS) and (nIterations<100)):
@@ -649,29 +694,36 @@ class Likelihood_Analyser:
                     
         return param_up
        
-        
-        
-    def DoScan(self, xi_min, xi_max, nstep, ts, conf_level, precision):
-        print(" Scanning injected fraction of events range [%.6f, %.6f]" % (xi_min, xi_max))
+    def DoScan2(self, ni_min, ni_max, nstep, ts, conf_level, precision):
+        #ni_min = int(self.nTotalEvents * xi_min)
+        #ni_max = int(self.nTotalEvents * xi_max)
+        #print(" Scanning injected fraction of events range [%.6f, %.6f]" % (xi_min, xi_max))
+        print(" Scanning injected fraction of events range [%i, %i]" % (ni_min, ni_max))
+      
         results = []
         step = 0
         frac = 0.
         tolerance = 0.1
         xi_mean = 0
+        ni_mean = 0
         frac_error = 0 
+        
+        ni_prev = 0
+        frac_prev = 0 
         
         nTrials = inv_BinomialError(precision, conf_level)
         
         print (" Doing %i trials for %i +/- %.1f C.L." %(nTrials, conf_level, precision))
         
         p = conf_level / 100
-        while (np.abs(frac - p) > frac_error) and (step < nstep):
-            xi_mean = (xi_max + xi_min)/2
+        
+        ni = ni_min
+        while (ni <= ni_max and ni >= ni_min):
             dic_results = {}
             
             TS = []
             for i in range(nTrials):
-                self.sampleObservation(xi_mean)
+                self.sampleObservationN(ni)
                 self.ComputeTestStatistics()
                 TS.append(self.TS)
 
@@ -681,40 +733,165 @@ class Likelihood_Analyser:
             frac = n/ntot
             frac_error = BinomialError(ntot, n)/ntot
 
-            print(" [%2d] xi %5.6f, n %4d, ntot %4d, C.L %.2f +/- %.2f" %
-                (step, xi_mean, n, ntot, frac * 100, frac_error * 100))
+            print(" [%2d] ni %i, [ni_min %i, ni_max %i], n %4d, ntot %4d, C.L %.2f +/- %.2f" %
+                (step, ni, ni_min, ni_max, n, ntot, frac * 100, frac_error * 100))
+            
+            
+            
+            dic_results['ni'] = ni
+            dic_results['xi'] = ni/self.nTotalEvents
 
-            if(frac < p):
-                xi_min = xi_mean
-            else:
-                xi_max = xi_mean
-
-            dic_results['xi'] = xi_mean
             dic_results['n'] = n
+
+            dic_results['ntrials'] = ntot
+            dic_results['TS_dis'] = TS
+            step += 1    
+            results.append(dic_results)
+            
+            if (np.abs(frac - p) < frac_error):
+                print ("Finishing...")
+                print (ni, self.nTotalEvents)
+                break
+            
+            if frac > p:
+                ni = ni - 1                
+            else:
+                ni = ni + 20        
+
+        return ni/self.nTotalEvents, results  
+        
+    def DoScan(self, xi_min, xi_max, nstep, ts, conf_level, precision):
+        ni_min = int(self.nTotalEvents * xi_min)
+        ni_max = int(self.nTotalEvents * xi_max)
+        print(" Scanning injected fraction of events range [%.6f, %.6f]" % (xi_min, xi_max))
+        print(" Scanning injected fraction of events range [%i, %i]" % (ni_min, ni_max))
+      
+        results = []
+        step = 0
+        frac = 0.
+        tolerance = 0.1
+        xi_mean = 0
+        ni_mean = 0
+        frac_error = 0 
+        
+        ni_prev = 0
+        frac_prev = 0 
+        
+        nTrials = inv_BinomialError(precision, conf_level)
+        
+        print (" Doing %i trials for %i +/- %.1f C.L." %(nTrials, conf_level, precision))
+        
+        p = conf_level / 100
+        while (np.abs(frac - p) > frac_error) and (step < nstep):
+            #xi_mean = (xi_max + xi_min)/2
+            ni_mean = int((ni_min + ni_max)/2)
+            
+            dic_results = {}
+            
+            TS = []
+            for i in range(nTrials):
+                self.sampleObservationN(ni_mean)
+                self.ComputeTestStatistics()
+                TS.append(self.TS)
+
+            TS = np.array(TS)
+            n = TS[np.where(TS > ts)].size
+            ntot = TS.size
+            frac = n/ntot
+            frac_error = BinomialError(ntot, n)/ntot
+
+            print(" [%2d] ni %i, [ni_min %i, ni_max %i], n %4d, ntot %4d, C.L %.2f +/- %.2f" %
+                (step, ni_mean, ni_min, ni_max, n, ntot, frac * 100, frac_error * 100))
+            
+            #We assume monotonic grow, if thats' not the case we repeat 
+            
+            if ((frac < frac_prev) and (ni_mean > ni_prev)):
+                #Wrong we need to get out
+                print ("this is wrong")
+                continue
+                
+            elif ((frac > frac_prev) and (ni_mean < ni_prev)):
+                #Wrong we need to get out
+                print ("this is wrong")
+                continue
+                
+            frac_prev = frac
+            ni_prev = ni_mean
+            
+            
+            if(frac < p):
+                ni_min = ni_mean 
+                #xi_min = (xi_max + xi_min)/4.
+            else:
+                ni_max = ni_mean
+                #xi_max = 3 * (xi_max + xi_min)/4.
+
+            
+            dic_results['ni'] = ni_mean
+            dic_results['xi'] = ni_mean/self.nTotalEvents
+
+            dic_results['n'] = n
+
             dic_results['ntrials'] = ntot
             dic_results['TS_dis'] = TS
             step += 1    
             results.append(dic_results)
                     
 
-        return xi_mean, results    
+        return ni_mean/self.nTotalEvents, results    
 
-    def CalculateFrequentistSensitivity(self,  conf_level, precision):
+    def CalculateFrequentistSensitivity(self,  conf_level, precision, factor = 3., first_guess = None):
         #Let's first guess using the likelihood intervales
         #To calculate the median a 100 trials seem enough
         sens = self.CalculateSensitivity(100, conf_level)
         median_ts = np.percentile(sens['TS_dist'], 50)
-        first_guess = sens['median']
+        
+        ts_95_low = np.percentile(sens['TS_dist'], 2.5)
+        ts_95_high = np.percentile(sens['TS_dist'], 97.5)
+        ts_68_low = np.percentile(sens['TS_dist'], 16.)
+        ts_68_high = np.percentile(sens['TS_dist'], 84.)
+        
+        if (first_guess is None): #Not given as parameter
+            print ("No first guess given... guessing it from Likelihood Intervals")    
+            first_guess = int(self.nTotalEvents * sens['median'])
+        
+        print (" Median TS: %.2f" %median_ts)
+        print (" First guess: %.4f" %first_guess)
+        
         p = conf_level/100
-        factor = 2.
         
         ni_min = first_guess / factor * (1 - p)
         ni_max = first_guess * factor / p
         
-        print (" Median TS: %.2f" %median_ts)
         
-        return self.DoScan(ni_min, ni_max, 50, median_ts,  conf_level, precision)
+        return self.DoScan2(ni_min, ni_max, 30, median_ts,  conf_level, precision)
         
+    def CalculateFrequentitsErrors(self, conf_level, precision):
+        sens = self.CalculateSensitivity(100, conf_level)
+        
+        ts_95_low = np.percentile(sens['TS_dist'], 2.5)
+        ts_95_high = np.percentile(sens['TS_dist'], 97.5)
+        ts_68_low = np.percentile(sens['TS_dist'], 16.)
+        ts_68_high = np.percentile(sens['TS_dist'], 84.)
+        
+        first_guess = sens['median']
+        p = conf_level/100
+        factor = 3.
+        
+        ni_min = first_guess / factor * (1 - p)
+        ni_max = first_guess * factor / p
+        
+        errors = {}
+        print (" Median TS 68% low: %.2f" %ts_68_low)
+        errors["error_68_low"] = self.DoScan2(ni_min, ni_max, 30, ts_68_low,  conf_level, precision)
+        print (" Median TS 68% high: %.2f" %ts_68_high)
+        errors["error_68_high"] = self.DoScan2(ni_min, ni_max, 30, ts_68_high,  conf_level, precision)
+        print (" Median TS 95% low: %.2f" %ts_95_low)
+        errors["error_95_low"] = self.DoScan2(ni_min, ni_max, 30, ts_95_low,  conf_level, precision)
+        print (" Median TS 95% high: %.2f" %ts_95_high)
+        errors["error_95_high"] = self.DoScan2(ni_min, ni_max, 30, ts_95_high,  conf_level, precision)
+        return errors
+    
     
     def CalculateSensitivity(self, nTrials, conf_level):
 
@@ -727,7 +904,7 @@ class Likelihood_Analyser:
             fits = []
         
         for i in range(nTrials):
-            self.sampleObservation(0.)
+            self.sampleObservationN(0.)
             self.ComputeTestStatistics()
             TS.append(self.TS)
 

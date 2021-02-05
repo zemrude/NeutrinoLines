@@ -52,7 +52,9 @@ r"""
     Returns:
     --------
     A fine binned numpy histogram 2d
-    A course binned phyist histogram with quantile binning (same statistical significance per bin)
+    2 physt binned phyist histogram with quantile binning (same statistical significance per bin)
+     with the same old binning, the other with the quantile binning
+     
     
 """
 usage = "usage: %prog [options]"
@@ -71,6 +73,7 @@ Datatype = options.TYPE
 
 #This are the fine binning for the standard numpy pdf
 bins_vars={'energy_rec':np.logspace(1,5,48+1),'psi_rec':np.linspace(0.,np.pi,90+1)}
+bins_vars2={'energy_rec':np.logspace(1,5,24+1),'psi_rec':np.linspace(0.,np.pi,10+1)}
 
 outfile_path = os.path.join(base_path, 'PDFs', 'Data_scrambledFullSky')
 
@@ -80,7 +83,7 @@ outfile = os.path.join(outfile_path, 'PDF_' + Datatype + '_ScrambleFullSky_LEBDT
 
 if os.path.isfile(outfile):
     print (' ... already exists')
-    sys.exit(1)
+ #   sys.exit(1)
 
 livetime = {}
 livetime['Burnsample'] = 1116125.821572
@@ -153,17 +156,32 @@ for year in allFiles[Datatype].keys():
         spinner.succeed(" Finished with year!")
 
 #We create the numpy histogram in linear energy and psi
-        
-hist_pdf = np.histogram2d(energy_reco,psi_reco,
-                                 bins=(bins_vars['energy_rec'], bins_vars['psi_rec']),weights = weight)
+ 
+print ("Max and min energies")
+print (np.max(np.log10(energy_reco)), np.min(np.log10(energy_reco)))
+    
+    
+np_hist_pdf = np.histogram2d(energy_reco,psi_reco, 
+                          bins=(bins_vars['energy_rec'], bins_vars['psi_rec']),weights = weight)
 
 #We create the physt histogram in linear psi and log10(energy)! Be aware of that, with final binning but quantile division
 #h2 (x , y, "binning_method", (binsx, binsy), [labelsx, labelsy])
 
-hphyst2 = h2(psi_reco, np.log10(energy_reco),"quantile", (10, 24), axis_names=["$\Psi$", "$\log_{10} E_{rec}$"])
+hphyst1 = h2(psi_reco, np.log10(energy_reco),"quantile", (10, 24), axis_names=["$\Psi$", "$\log_{10} E_{rec}$"])
+hphyst2 = h2(psi_reco, energy_reco, bins=(bins_vars2['psi_rec'], bins_vars2['energy_rec']), axis_names=["$\Psi$", "$\log_{10} E_{rec}$"])
+hphyst3 = h2(psi_reco, np.log10(energy_reco),"quantile", (9, 9), axis_names=["$\Psi$", "$\log_{10} E_{rec}$"])
+#25/11/2020 New binning, more bins (4x) in energy
+hphyst4 = h2(psi_reco, np.log10(energy_reco),"quantile", (9, 36), axis_names=["$\Psi$", "$\log_{10} E_{rec}$"])
+
+#Let's go nuts, and do 8x binings
+hphyst5 = h2(psi_reco, np.log10(energy_reco),"quantile", (9, 72), axis_names=["$\Psi$", "$\log_{10} E_{rec}$"])
+
+#Let's go nuts, and do 8x binings
+hphyst6 = h2(psi_reco, np.log10(energy_reco),"quantile", (18, 72), axis_names=["$\Psi$", "$\log_{10} E_{rec}$"])
+
 
 savefile = open(outfile,'wb')
 
-pickle.dump([hist_pdf, hphyst2], savefile)
+pickle.dump([np_hist_pdf, hphyst1, hphyst2, hphyst3, hphyst4, hphyst5, hphyst6], savefile)
 
 cprint (' ... Done!', 'green')
